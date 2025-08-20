@@ -1,3 +1,5 @@
+"""Gemini model request implementation."""
+
 import os
 from PyQt5.QtGui import QPixmap
 
@@ -9,10 +11,29 @@ except Exception:
     genai = None
 
 class GeminiRequest(Request):
+    """Send a PNG image to Gemini and return the generated text.
+
+    Attributes:
+        (inherited) _prompt_file (Path): Path to the prompt template used for requests.
+    """
+
     def __init__(self):
+        """Initialize with the default Gemini prompt template.
+        """
         super().__init__("gemini_image_to_latex.txt")
 
     def send_image(self, image: QPixmap) -> str:
+        """Send an image to Gemini and return generated text.
+
+        Args:
+            image (bytes): PNG-encoded bytes expected by the SDK.
+
+            Note: the caller currently provides PNG bytes from the capture layer.
+
+        Returns:
+            Optional[str]: Generated text from Gemini, or None if the SDK is
+            unavailable, the API key is missing, or the response has no text.
+        """
         prompt: str = self._read_prompt_from_file()
         if genai is None:
             print("Gemini SDK not installed. Skipping send.")
