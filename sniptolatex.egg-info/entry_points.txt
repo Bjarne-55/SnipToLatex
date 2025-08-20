@@ -1,0 +1,2 @@
+[gui_scripts]
+snip-to-latex = snip_to_latex:main

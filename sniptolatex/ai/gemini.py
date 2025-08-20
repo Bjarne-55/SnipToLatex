@@ -4,6 +4,7 @@ import os
 from PyQt5.QtGui import QPixmap
 
 from .request import Request
+from sniptolatex.config import read_config
 
 try:
     import google.generativeai as genai
@@ -38,7 +39,13 @@ class GeminiRequest(Request):
         if genai is None:
             print("Gemini SDK not installed. Skipping send.")
             return
-        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        # Ensure config exists and try to read API key from it first
+        cfg = read_config()
+        api_key = (
+            cfg.get("api_key")
+            or os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("GOOGLE_API_KEY")
+        )
 
         if not api_key:
             print("GEMINI_API_KEY/GOOGLE_API_KEY not set. Skipping send.")

@@ -7,7 +7,7 @@ and then closes itself.
 
 from PyQt5.QtCore import QPoint, QRect, Qt, pyqtSignal
 from PyQt5.QtGui import QColor, QGuiApplication, QMouseEvent, QPainter, QPen, QPixmap
-from PyQt5.QtWidgets import QWidget, QPushButton
+from PyQt5.QtWidgets import QWidget, QPushButton, QSystemTrayIcon, QMenu, QAction
 
 from .capture import capture_and_copy, get_virtual_geometry
 from .settings_dialog import SettingsDialog

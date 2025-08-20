@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sniptolatex"
+version = "0.1.0"
+description = "Snip a screen region and convert to LaTeX via Gemini, copying the result to the clipboard."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "SnipToLatex" }
+]
+dependencies = [
+  "pynput==1.7.7",
+  "PyQt5==5.15.11",
+  "google-generativeai==0.7.2",
+]
+
+[project.entry-points."gui_scripts"]
+snip-to-latex = "snip_to_latex:main"
+
+[tool.setuptools]
+include-package-data = true
+py-modules = ["snip_to_latex"]
+
+[tool.setuptools.packages.find]
+include = ["sniptolatex*"]
+
+[tool.setuptools.package-data]
+sniptolatex = ["ai/prompts/*.txt"]
+
+[tool.setuptools.data-files]
+# Ensure a default config directory is created in wheels (empty file will be created at runtime anyway)
+# Not strictly necessary, but keeps packaging explicit.
+
+

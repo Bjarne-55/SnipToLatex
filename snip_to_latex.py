@@ -3,7 +3,8 @@ import sys
 import signal
 import threading
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
+from PyQt5.QtGui import QIcon, QPixmap, QColor
 
 # Use modular implementations
 from sniptolatex.controller import Controller as AppController
@@ -14,6 +15,8 @@ from sniptolatex.hotkeys import (
 
 def main() -> int:
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
+
     # Allow Ctrl+C to quit the Qt loop cleanly
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     pump = QTimer()
@@ -29,6 +32,21 @@ def main() -> int:
     t = threading.Thread(target=listener.run, daemon=True)
     t.start()
 
+    # Add a tray icon so the app can run headless without a console window
+    if QSystemTrayIcon.isSystemTrayAvailable():
+        tray = QSystemTrayIcon()
+        # Minimal in-memory icon so the tray actually shows up on Windows
+        pix = QPixmap(16, 16)
+        pix.fill(QColor(0, 153, 255))
+        tray.setIcon(QIcon(pix))
+        # Simple context menu with Quit
+        menu = QMenu()
+        quit_action = QAction("Quit", menu)
+        quit_action.triggered.connect(app.quit)
+        menu.addAction(quit_action)
+        tray.setContextMenu(menu)
+        tray.setToolTip("SnipToLatex: Press Win+Shift+C")
+        tray.show()
     print("Listening for Super+Shift+C ...")
     code = app.exec_()
 
