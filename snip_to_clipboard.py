@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 import sys
+import os
 import signal
 import threading
 from typing import Optional
 
 from pynput import keyboard
 
-from PyQt5.QtCore import QPoint, QRect, Qt, QSize, pyqtSignal, QObject, QTimer
-from PyQt5.QtGui import QColor, QGuiApplication, QMouseEvent, QPainter, QPen, QPixmap
+from PyQt5.QtCore import QPoint, QRect, Qt, QSize, pyqtSignal, QObject, QTimer, QBuffer, QByteArray, QIODevice
+from PyQt5.QtGui import QColor, QGuiApplication, QMouseEvent, QPainter, QPen, QPixmap, QClipboard
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QDialog, QVBoxLayout, QLabel
+
+try:
+    import google.generativeai as genai  # type: ignore
+except Exception:
+    genai = None  # type: ignore
 
 
 def get_virtual_geometry() -> QRect:
@@ -46,6 +52,58 @@ def grab_full_desktop_pixmap() -> Optional[QPixmap]:
             painter.end()
         return stitched
     return pix
+
+
+def _pixmap_to_png_bytes(pixmap: QPixmap) -> Optional[bytes]:
+    buffer_array = QByteArray()
+    buffer = QBuffer(buffer_array)
+    if not buffer.open(QIODevice.WriteOnly):
+        return None
+    ok = pixmap.save(buffer, 'PNG')
+    buffer.close()
+    if not ok:
+        return None
+    return bytes(buffer_array)
+
+
+def _read_prompt_from_file(default_prompt: str) -> str:
+    try:
+        prompt_path = os.path.join(os.path.dirname(__file__), 'prompt_image_to_latex.txt')
+        with open(prompt_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception:
+        return default_prompt
+
+
+def _send_image_to_gemini(pixmap: QPixmap) -> None:
+    prompt: str = _read_prompt_from_file("Placeholder: summarize this screenshot")
+    if genai is None:
+        print("Gemini SDK not installed. Skipping send.")
+        return
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        print("GEMINI_API_KEY/GOOGLE_API_KEY not set. Skipping send.")
+        return
+    png_bytes = _pixmap_to_png_bytes(pixmap)
+    if not png_bytes:
+        print("Failed to encode image for Gemini.")
+        return
+    try:
+        genai.configure(api_key=api_key)
+        model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        model = genai.GenerativeModel(model_name)
+        image_part = {"mime_type": "image/png", "data": png_bytes}
+        resp = model.generate_content([prompt, image_part])
+
+        # Prefer the convenience .text; fall back to candidates/parts
+        text = getattr(resp, "text", None)
+        if text:
+            QGuiApplication.clipboard().setText(text)
+            print("Gemini:", text)
+        else:
+            print("Gemini: response received (no text)")
+    except Exception as exc:
+        print("Gemini error:", exc)
 
 
 class SettingsDialog(QDialog):
@@ -177,7 +235,11 @@ class SelectionOverlay(QWidget):
         if bounded.isEmpty():
             return
         cropped = full.copy(bounded)
-        QGuiApplication.clipboard().setPixmap(cropped)
+        print("Sending to Gemini")
+        # Do NOT copy image to clipboard; we will copy Gemini's text result instead
+        # Send to Gemini in background (if configured)
+        threading.Thread(target=_send_image_to_gemini, args=(cropped,), daemon=True).start()
+        #_send_image_to_gemini(cropped)
 
     def paintEvent(self, _event) -> None:
         painter = QPainter(self)
