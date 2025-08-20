@@ -44,3 +44,9 @@ The app runs without a visible window and keeps a single global hotkey registere
 deactivate
 rm -rf .venv
 ```
+
+## Example config.ini
+[sniptolatex]
+# Put your Gemini/Google API key here (uncomment and set):
+# api_key = MY_KEY
+
