@@ -18,41 +18,33 @@ except Exception:
 
 
 def get_virtual_geometry() -> QRect:
-    screens = QGuiApplication.screens()
-    if not screens:
+    screen = QGuiApplication.primaryScreen()
+    if screen is None:
         return QRect(0, 0, 0, 0)
-    geom = screens[0].geometry()
-    for s in screens[1:]:
-        geom = geom.united(s.geometry())
-    return geom
+    return screen.virtualGeometry()
 
 
 def grab_full_desktop_pixmap() -> Optional[QPixmap]:
     screen = QGuiApplication.primaryScreen()
     if screen is None:
         return None
-    pix = screen.grabWindow(0)
-    if not pix or pix.isNull():
-        screens = QGuiApplication.screens()
-        if not screens:
-            return None
-        virtual_rect = get_virtual_geometry()
-        if virtual_rect.width() <= 0 or virtual_rect.height() <= 0:
-            return None
-        stitched = QPixmap(virtual_rect.size())
-        stitched.fill(Qt.transparent)
-        painter = QPainter(stitched)
-        try:
-            for s in screens:
-                s_pix = s.grabWindow(0)
-                if s_pix and not s_pix.isNull():
-                    offset = s.geometry().topLeft() - virtual_rect.topLeft()
-                    painter.drawPixmap(offset, s_pix)
-        finally:
-            painter.end()
-        return stitched
-    return pix
 
+    virtual_rect = screen.virtualGeometry()
+    if virtual_rect.isNull() or virtual_rect.isEmpty():
+        return None
+
+    composed = QPixmap(virtual_rect.size())
+    composed.fill(Qt.transparent)
+
+    with QPainter(composed) as painter:
+        for s in screen.virtualSiblings():
+            spix = s.grabWindow(0)
+            if spix.isNull():
+                continue
+            top_left = s.geometry().topLeft() - virtual_rect.topLeft()
+            painter.drawPixmap(top_left, spix)
+
+    return composed
 
 def _pixmap_to_png_bytes(pixmap: QPixmap) -> Optional[bytes]:
     buffer_array = QByteArray()
@@ -227,19 +219,22 @@ class SelectionOverlay(QWidget):
 
     def _capture_and_copy(self, capture_rect: QRect) -> None:
         if capture_rect.width() <= 1 or capture_rect.height() <= 1:
+            print("capture_rect is too small")
             return
         full = grab_full_desktop_pixmap()
+        print("full", full)
         if full is None or full.isNull():
+            print("full is None or full.isNull()")
             return
         bounded = capture_rect.intersected(QRect(QPoint(0, 0), full.size()))
         if bounded.isEmpty():
+            print("bounded is empty")
             return
         cropped = full.copy(bounded)
+        QGuiApplication.clipboard().setPixmap(cropped)
         print("Sending to Gemini")
-        # Do NOT copy image to clipboard; we will copy Gemini's text result instead
         # Send to Gemini in background (if configured)
         threading.Thread(target=_send_image_to_gemini, args=(cropped,), daemon=True).start()
-        #_send_image_to_gemini(cropped)
 
     def paintEvent(self, _event) -> None:
         painter = QPainter(self)
