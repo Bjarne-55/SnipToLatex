@@ -9,10 +9,36 @@ This module provides utilities to:
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, Future
 
-from PyQt5.QtCore import QPoint, QRect, Qt, QBuffer, QByteArray, QIODevice
+from PyQt5.QtCore import QPoint, QRect, Qt, QBuffer, QByteArray, QIODevice, QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QGuiApplication, QPixmap, QPainter
 
 from .ai import GeminiRequest
+
+
+class _ClipboardBridge(QObject):
+    """Bridge to ensure clipboard writes happen on the Qt main thread.
+
+    On Windows, the clipboard relies on COM which is initialized for the
+    GUI thread. Emitting a signal from a worker thread to this object will
+    schedule the slot on the main thread via a queued connection.
+    """
+
+    _copyRequested = pyqtSignal(str)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._copyRequested.connect(self._set_clipboard_text)
+
+    def request_copy(self, text: str) -> None:
+        self._copyRequested.emit(text)
+
+    @pyqtSlot(str)
+    def _set_clipboard_text(self, text: str) -> None:
+        QGuiApplication.clipboard().setText(text)
+
+
+# Singleton living in the main thread (module imported on main thread)
+_clipboard_bridge = _ClipboardBridge()
 
 def capture_and_copy(capture_rect: QRect) -> None:
         """Capture a region and copy model output to the clipboard.
@@ -54,7 +80,8 @@ def copy_response(future: Future) -> None:
     """
     result = future.result()
     print(f"Model result: {result}")
-    QGuiApplication.clipboard().setText(result)
+    # Forward clipboard write to main thread to avoid CO_E_NOTINITIALIZED on Windows
+    _clipboard_bridge.request_copy(result)
 
 def get_virtual_geometry() -> QRect:
     """Return the union geometry across all monitors.
