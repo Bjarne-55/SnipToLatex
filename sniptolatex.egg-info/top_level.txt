@@ -1,2 +1,0 @@
-snip_to_latex
-sniptolatex
