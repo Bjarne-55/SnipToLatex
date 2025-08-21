@@ -35,6 +35,9 @@ class GeminiRequest(Request):
             Optional[str]: Generated text from Gemini, or None if the SDK is
             unavailable, the API key is missing, or the response has no text.
         """
+        import time
+        time.sleep(2)
+        return "test"
         prompt: str = self._read_prompt_from_file()
         if genai is None:
             print("Gemini SDK not installed. Skipping send.")

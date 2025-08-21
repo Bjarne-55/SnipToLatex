@@ -6,8 +6,8 @@ Provides two simple states:
 """
 
 from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QSize
-from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout
-from PyQt5.QtGui import QMovie
+from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout, QToolButton, QSpacerItem, QSizePolicy
+from PyQt5.QtGui import QMovie, QPixmap
 from pathlib import Path
 
 
@@ -23,9 +23,9 @@ class Toast(QWidget):
         self._card = QWidget(self)
         self._card.setObjectName("toastCard")
 
-        # Default style (rounded dark background) on the card only
+        # White card style similar to system toast
         self._card.setStyleSheet(
-            "#toastCard{background-color: rgba(24,24,27,230); border: 1px solid rgba(255,255,255,28); border-radius: 12px;}"
+            "#toastCard{background-color: #FFFFFF; border: 1px solid #ababab; border-radius: 10px;}"
         )
 
         # Root layout holds the single card
@@ -33,17 +33,29 @@ class Toast(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.addWidget(self._card)
 
-        # Inside the card, place icon + text
-        self._icon = QLabel(self._card)
-        self._text = QLabel(self._card)
-        self._text.setStyleSheet("color: white; font-size: 14px; font-weight: 500; background: transparent;")
-        self._icon.setStyleSheet("color: #E5E7EB; background: transparent;")
+        # Inside the card, create top content row and bottom accent bar
+        content_layout = QVBoxLayout(self._card)
+        content_layout.setContentsMargins(0, 12, 0, 12)
+        content_layout.setSpacing(8)
 
-        layout = QHBoxLayout(self._card)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setSpacing(10)
-        layout.addWidget(self._icon)
-        layout.addWidget(self._text)
+        row = QHBoxLayout()
+        row.setContentsMargins(16, 0, 16, 0)
+        row.setSpacing(10)
+        row.setAlignment(Qt.AlignVCenter)
+
+        self._icon = QLabel(self._card)
+        self._icon.setAlignment(Qt.AlignCenter)
+        self._icon.setFixedSize(30, 30)
+
+        self._text = QLabel(self._card)
+        self._text.setStyleSheet("font-family: 'Segoe UI'; color: #000; font-size: 16px; font-weight: 400; background: transparent;")
+
+        row.addWidget(self._icon)
+        row.addWidget(self._text)
+        row.addItem(QSpacerItem(10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+        content_layout.addLayout(row)
+        content_layout.setAlignment(row, Qt.AlignVCenter)
 
         # Auto-close timer for success state
         self._close_timer = QTimer(self)
@@ -58,11 +70,9 @@ class Toast(QWidget):
         self._fade_anim = QPropertyAnimation(self, b"windowOpacity", self)
         self._fade_anim.setDuration(180)
 
-        # Keep icon width stable for layout
-        self._icon.setFixedWidth(20)
-
-        # Keep reference to loading movie to avoid GC stopping animation
+        # load spinning animation and check icon
         self._loading_movie = self._load_loading_movie()
+        self._check_icon = self._load_check_icon()
 
     def _place_bottom_center(self) -> None:
         if self._positioned:
@@ -82,43 +92,36 @@ class Toast(QWidget):
         self.move(max(left_bound, min(x, right_bound)), max(geo.top() + 12, y))
         self._positioned = True
 
-    def show_loading(self, message: str = "Sending to model…") -> None:
+    def show_loading(self) -> None:
         """Show the toast with an indeterminate spinner."""
-        # Modern simple loading indicator using unicode to avoid non-transparent GIF artifacts
+        # Spinner inside a neutral circle
+        self._icon.setPixmap(QPixmap())
         self._icon.setMovie(self._loading_movie)
         self._loading_movie.start()
         self._icon.setText("")
-        self._icon.setStyleSheet("color: #E5E7EB; background: transparent; font-size: 16px;")
-
-        self._text.setText(message)
+        
+        self._text.setText("Sending to model")
         self._close_timer.stop()
-        self._positioned = False
         self.setWindowOpacity(1.0)
         self.show()
         self.raise_()
         self._place_bottom_center()
 
-    def show_success(self, message: str = "Copied to clipboard") -> None:
+    def show_success(self) -> None:
         """Show a success state and auto-dismiss after a short delay."""
         self._loading_movie.stop()
         self._icon.setMovie(None)
-        self._icon.setText("✔️")
-        self._icon.setStyleSheet("color: #10B981; background: transparent; font-size: 18px;")
-        self._text.setText(message)
-        self._positioned = False
-        self.setWindowOpacity(0.0)
+        self._icon.setText("")
+        self._icon.setPixmap(self._check_icon)
+
+        self._text.setText("Copied to clipboard")
+        self.setWindowOpacity(1.0)
         self.show()
         self.raise_()
         self._place_bottom_center()
         # animate a quick fade-in for a subtle success feel
-        try:
-            self._fade_anim.stop()
-            self._fade_anim.setStartValue(0.0)
-            self._fade_anim.setEndValue(1.0)
-            self._fade_anim.start()
-        except Exception:
-            pass
         self._close_timer.start(1500)
+        
 
     def _fade_out_and_hide(self) -> None:
         try:
@@ -139,9 +142,15 @@ class Toast(QWidget):
             self.hide()
     
     def _load_loading_movie(self) -> QMovie:
-        resource_path = Path(__file__).parent / "resources" / "Rolling@1x-2.2s-200px-200px.gif"
+        resource_path = Path(__file__).parent / "resources" / "Rolling@1x-3.3s-200px-200px.gif"
         movie = QMovie(str(resource_path))
-        movie.setScaledSize(QSize(25, 25))
+        movie.setScaledSize(self._icon.size())
         return movie
+
+    def _load_check_icon(self) -> QPixmap:
+        resource_path = Path(__file__).parent / "resources" / "check.svg"
+        pixmap = QPixmap(str(resource_path))
+        pixmap = pixmap.scaled(self._icon.size(), Qt.KeepAspectRatio, transformMode=Qt.SmoothTransformation)
+        return pixmap
 
 

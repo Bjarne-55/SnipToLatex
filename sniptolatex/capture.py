@@ -25,7 +25,7 @@ class _ClipboardBridge(QObject):
     """
 
     _copyRequested = pyqtSignal(str)
-    _toastSuccessRequested = pyqtSignal(str)
+    _toastSuccessRequested = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -43,23 +43,22 @@ class _ClipboardBridge(QObject):
     def request_copy(self, text: str) -> None:
         self._copyRequested.emit(text)
 
-    def show_loading(self, message: str) -> None:
+    def show_loading(self) -> None:
         self._ensure_toast()
         if self._toast is not None:
-            self._toast.show_loading(message)
+            self._toast.show_loading()
 
-    def request_toast_success(self, message: str) -> None:
-        self._toastSuccessRequested.emit(message)
+    def request_toast_success(self) -> None:
+        self._toastSuccessRequested.emit()
 
     @pyqtSlot(str)
     def _set_clipboard_text(self, text: str) -> None:
         QGuiApplication.clipboard().setText(text)
 
-    @pyqtSlot(str)
-    def _show_toast_success(self, message: str) -> None:
+    def _show_toast_success(self) -> None:
         self._ensure_toast()
         if self._toast is not None:
-            self._toast.show_success(message)
+            self._toast.show_success()
 
 
 # Singleton living in the main thread (module imported on main thread)
@@ -87,7 +86,7 @@ def capture_and_copy(capture_rect: QRect) -> None:
 
         # Send to Gemini in background to avoid blocking the UI
         print("Sending to Gemini")
-        _clipboard_bridge.show_loading("Sending to model…")
+        _clipboard_bridge.show_loading()
         gemini = GeminiRequest()
         executor = ThreadPoolExecutor()
         future = executor.submit(gemini.send_image, cropped_png)
@@ -110,7 +109,7 @@ def copy_response(future: Future) -> None:
     # Forward clipboard write to main thread to avoid CO_E_NOTINITIALIZED on Windows
     _clipboard_bridge.request_copy(result)
     # Show success toast on the main thread
-    _clipboard_bridge.request_toast_success("Copied to clipboard")
+    _clipboard_bridge.request_toast_success()
 
 def get_virtual_geometry() -> QRect:
     """Return the union geometry across all monitors.
