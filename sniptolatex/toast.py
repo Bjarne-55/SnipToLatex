@@ -5,8 +5,10 @@ Provides two simple states:
 - success: shows a checkmark and message, then auto-dismisses
 """
 
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation
+from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QSize
 from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout
+from PyQt5.QtGui import QMovie
+from pathlib import Path
 
 
 class Toast(QWidget):
@@ -59,6 +61,9 @@ class Toast(QWidget):
         # Keep icon width stable for layout
         self._icon.setFixedWidth(20)
 
+        # Keep reference to loading movie to avoid GC stopping animation
+        self._loading_movie = self._load_loading_movie()
+
     def _place_bottom_center(self) -> None:
         if self._positioned:
             return
@@ -80,8 +85,9 @@ class Toast(QWidget):
     def show_loading(self, message: str = "Sending to model…") -> None:
         """Show the toast with an indeterminate spinner."""
         # Modern simple loading indicator using unicode to avoid non-transparent GIF artifacts
-        self._icon.setMovie(None)
-        self._icon.setText("⏳")
+        self._icon.setMovie(self._loading_movie)
+        self._loading_movie.start()
+        self._icon.setText("")
         self._icon.setStyleSheet("color: #E5E7EB; background: transparent; font-size: 16px;")
 
         self._text.setText(message)
@@ -94,8 +100,9 @@ class Toast(QWidget):
 
     def show_success(self, message: str = "Copied to clipboard") -> None:
         """Show a success state and auto-dismiss after a short delay."""
+        self._loading_movie.stop()
         self._icon.setMovie(None)
-        self._icon.setText("✓")
+        self._icon.setText("✔️")
         self._icon.setStyleSheet("color: #10B981; background: transparent; font-size: 18px;")
         self._text.setText(message)
         self._positioned = False
@@ -130,5 +137,11 @@ class Toast(QWidget):
             self._fade_anim.start()
         except Exception:
             self.hide()
+    
+    def _load_loading_movie(self) -> QMovie:
+        resource_path = Path(__file__).parent / "resources" / "Rolling@1x-2.2s-200px-200px.gif"
+        movie = QMovie(str(resource_path))
+        movie.setScaledSize(QSize(25, 25))
+        return movie
 
 
