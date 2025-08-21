@@ -32,10 +32,6 @@ def main() -> int:
     t = threading.Thread(target=listener.run, daemon=True)
     t.start()
 
-    #from sniptolatex.toast import Toast
-    #toast = Toast()
-    #toast.show_loading()
-
     # Add a tray icon so the app can run headless without a console window
     if QSystemTrayIcon.isSystemTrayAvailable():
         tray = QSystemTrayIcon()
