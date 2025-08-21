@@ -8,6 +8,7 @@ sniptolatex/controller.py
 sniptolatex/hotkeys.py
 sniptolatex/overlay.py
 sniptolatex/settings_dialog.py
+sniptolatex/toast.py
 sniptolatex.egg-info/PKG-INFO
 sniptolatex.egg-info/SOURCES.txt
 sniptolatex.egg-info/dependency_links.txt

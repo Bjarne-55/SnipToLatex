@@ -13,6 +13,7 @@ from PyQt5.QtCore import QPoint, QRect, Qt, QBuffer, QByteArray, QIODevice, QObj
 from PyQt5.QtGui import QGuiApplication, QPixmap, QPainter
 
 from .ai import GeminiRequest
+from .toast import Toast
 
 
 class _ClipboardBridge(QObject):
@@ -24,17 +25,41 @@ class _ClipboardBridge(QObject):
     """
 
     _copyRequested = pyqtSignal(str)
+    _toastSuccessRequested = pyqtSignal(str)
 
     def __init__(self) -> None:
         super().__init__()
         self._copyRequested.connect(self._set_clipboard_text)
+        self._toastSuccessRequested.connect(self._show_toast_success)
+
+        # Lazily create UI elements only after QApplication exists
+        self._toast = None
+
+    def _ensure_toast(self) -> None:
+        # Create toast only when a QApplication (QGuiApplication) exists
+        if self._toast is None and QGuiApplication.instance() is not None:
+            self._toast = Toast()
 
     def request_copy(self, text: str) -> None:
         self._copyRequested.emit(text)
 
+    def show_loading(self, message: str) -> None:
+        self._ensure_toast()
+        if self._toast is not None:
+            self._toast.show_loading(message)
+
+    def request_toast_success(self, message: str) -> None:
+        self._toastSuccessRequested.emit(message)
+
     @pyqtSlot(str)
     def _set_clipboard_text(self, text: str) -> None:
         QGuiApplication.clipboard().setText(text)
+
+    @pyqtSlot(str)
+    def _show_toast_success(self, message: str) -> None:
+        self._ensure_toast()
+        if self._toast is not None:
+            self._toast.show_success(message)
 
 
 # Singleton living in the main thread (module imported on main thread)
@@ -62,6 +87,7 @@ def capture_and_copy(capture_rect: QRect) -> None:
 
         # Send to Gemini in background to avoid blocking the UI
         print("Sending to Gemini")
+        _clipboard_bridge.show_loading("Sending to model…")
         gemini = GeminiRequest()
         executor = ThreadPoolExecutor()
         future = executor.submit(gemini.send_image, cropped_png)
@@ -78,10 +104,13 @@ def copy_response(future: Future) -> None:
         Exception: Propagates any exception raised by ``future.result()``
             if the background task failed.
     """
+    # This callback runs in a worker thread. Do not touch GUI directly here.
     result = future.result()
     print(f"Model result: {result}")
     # Forward clipboard write to main thread to avoid CO_E_NOTINITIALIZED on Windows
     _clipboard_bridge.request_copy(result)
+    # Show success toast on the main thread
+    _clipboard_bridge.request_toast_success("Copied to clipboard")
 
 def get_virtual_geometry() -> QRect:
     """Return the union geometry across all monitors.

@@ -20,38 +20,10 @@ Minimal headless snipping tool written in Python.
 
 ## Setup
 
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
+### Example config.ini
+```
+[sniptolatex]
+# Put your Gemini/Google API key here (uncomment and set):
+# api_key = MY_KEY
 ```
 
-## Run
-
-```bash
-python snip_to_clipboard.py
-```
-
-- Specify a custom hotkey (can repeat flag or comma-separate):
-
-```bash
-python snip_to_clipboard.py --hotkey Ctrl+Shift+C
-python snip_to_clipboard.py --hotkey Ctrl+Alt+C --hotkey Ctrl+Shift+C
-python snip_to_clipboard.py --hotkey "Ctrl+Win+C,Ctrl+Super+C,Ctrl+Meta+C,Ctrl+Shift+C"
-```
-
-The app runs without a visible window and keeps a single global hotkey registered. Press the hotkey to start a selection overlay. Drag to select, release to capture to clipboard. Press `Esc` or right-click to cancel.
-
-## Linux (X11) notes
-- If the Win/Super key cannot be bound by your window manager, use `--hotkey Ctrl+Shift+C`.
-- If your environment is Wayland, use an X11 session for this tool or use a portal-based screenshot tool.
-
-## Windows notes
-- The `keyboard` library is used for the global hotkey. It may require Administrator privileges to capture global hotkeys in some environments.
-
-## Uninstall
-
-```bash
-deactivate
-rm -rf .venv
-```
