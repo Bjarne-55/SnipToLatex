@@ -4,7 +4,7 @@ Provides read/write helpers for application- and model-level settings:
  - Selected model name under section ``[sniptolatex]`` key ``model``.
  - Per-model sections named ``[model.<name>]`` with keys:
      - ``api_key``: string
-     - ``prompt_override``: string (optional; if absent, default prompt is used)
+     - ``prompt``: string (the effective prompt; if absent, default prompt file is used)
      - ``force_no_bold``: bool as ``true``/``false`` (optional; defaults to true)
 """
 
@@ -71,17 +71,17 @@ def _model_section(model: str) -> str:
 def read_model_settings(model: str) -> Dict[str, Optional[str]]:
     """Return per-model settings dict.
 
-    Keys: 'api_key' (str|None), 'prompt_override' (str|None), 'force_no_bold' (str|None)
+    Keys: 'api_key' (str|None), 'prompt' (str|None), 'force_no_bold' (str|None)
     The 'force_no_bold' is returned as 'true'/'false' string or None if unset.
     """
     parser = _load_parser()
     section = _model_section(model)
     api_key = parser.get(section, "api_key", fallback=None)
-    prompt_override = parser.get(section, "prompt_override", fallback=None)
+    prompt_value = parser.get(section, "prompt", fallback=None)
     force_no_bold = parser.get(section, "force_no_bold", fallback=None)
     return {
         "api_key": api_key,
-        "prompt_override": prompt_override,
+        "prompt": prompt_value,
         "force_no_bold": force_no_bold,
     }
 
@@ -90,7 +90,7 @@ def write_model_settings(
     model: str,
     *,
     api_key: Optional[str] = None,
-    prompt_override: Optional[str] = None,
+    prompt: Optional[str] = None,
     force_no_bold: Optional[bool] = None,
 ) -> None:
     """Persist per-model settings; pass None to leave fields unchanged."""
@@ -100,10 +100,8 @@ def write_model_settings(
         parser.add_section(section)
     if api_key is not None:
         parser.set(section, "api_key", api_key)
-    if prompt_override is not None:
-        parser.set(section, "prompt_override", prompt_override)
+    if prompt is not None:
+        parser.set(section, "prompt", prompt)
     if force_no_bold is not None:
         parser.set(section, "force_no_bold", "true" if force_no_bold else "false")
     _save_parser(parser)
-
-

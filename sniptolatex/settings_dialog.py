@@ -20,7 +20,9 @@ from PyQt5.QtWidgets import (
     QPlainTextEdit,
     QDialogButtonBox,
     QWidget,
+    QPushButton,
 )
+from pathlib import Path
 
 from .config import (
     get_selected_model,
@@ -103,16 +105,25 @@ class SettingsDialog(QDialog):
         self.chk_no_bold = QCheckBox("Force no bold (\\mathbf) in output", self)
         row_personal.addWidget(lbl_personal)
         row_personal.addWidget(self.chk_no_bold)
+        self.chk_no_bold.toggled.connect(self._on_no_bold_toggled)
         root.addLayout(row_personal)
 
         # Prompt editor
+        # Prompt header with reset button
+        header = QHBoxLayout()
+        header.setSpacing(8)
         lbl_prompt = QLabel("Prompt", self)
         lbl_prompt.setObjectName("groupLabel")
+        header.addWidget(lbl_prompt)
+        header.addStretch(1)
+        self.btn_reset = QPushButton("Reset to default", self)
+        self.btn_reset.clicked.connect(self._reset_prompt_to_default)
+        header.addWidget(self.btn_reset)
         self.txt_prompt = QPlainTextEdit(self)
         self.txt_prompt.setPlaceholderText("Edit the prompt sent to the model...")
         self.txt_prompt.setTabChangesFocus(False)
         self.txt_prompt.setLineWrapMode(QPlainTextEdit.NoWrap)
-        root.addWidget(lbl_prompt)
+        root.addLayout(header)
         root.addWidget(self.txt_prompt, 1)
 
         # Buttons
@@ -122,9 +133,12 @@ class SettingsDialog(QDialog):
         root.addWidget(buttons)
 
     def _default_prompt_for(self, model: str) -> str:
-        if model == "chatgpt":
-            return ChatGPTRequest()._read_prompt_from_file()
-        return GeminiRequest()._read_prompt_from_file()
+        name = "chatgpt_image_to_latex.txt" if model == "chatgpt" else "gemini_image_to_latex.txt"
+        path = Path(__file__).parent / "ai" / "prompts" / name
+        try:
+            return path.read_text(encoding="utf-8")
+        except Exception:
+            return ""
 
     def _load_initial_values(self) -> None:
         model = get_selected_model()
@@ -140,10 +154,18 @@ class SettingsDialog(QDialog):
         # Default True if not set to preserve existing behavior
         self.chk_no_bold.setChecked(True if force_no_bold is None else (force_no_bold.lower() == "true"))
 
-        # Load prompt override or default prompt
-        override = cfg.get("prompt_override")
-        raw = override if (override is not None and len(override) > 0) else self._default_prompt_for(model)
+        # Load stored prompt or default prompt
+        stored = cfg.get("prompt")
+        raw = stored if (stored is not None and len(stored) > 0) else self._default_prompt_for(model)
         self.txt_prompt.setPlainText(raw)
+
+    def _reset_prompt_to_default(self) -> None:
+        model = self.cmb_model.currentData()
+        self.txt_prompt.setPlainText(self._default_prompt_for(model))
+
+    def _on_no_bold_toggled(self, checked: bool) -> None:
+        pass
+        #do nothing currently
 
     def _on_model_changed(self, _idx: int) -> None:
         self._load_values_for_model(self.cmb_model.currentData())
@@ -156,9 +178,7 @@ class SettingsDialog(QDialog):
         write_model_settings(
             model,
             api_key=self.txt_key.text().strip(),
-            prompt_override=self.txt_prompt.toPlainText(),
+            prompt=self.txt_prompt.toPlainText(),
             force_no_bold=self.chk_no_bold.isChecked(),
         )
         self.accept()
-
-

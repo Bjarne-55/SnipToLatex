@@ -4,7 +4,6 @@ import os
 from PyQt5.QtGui import QPixmap
 
 from .request import Request
-from sniptolatex.config import read_model_settings
 
 try:
     import google.generativeai as genai
@@ -12,11 +11,7 @@ except Exception:
     genai = None
 
 class GeminiRequest(Request):
-    """Send a PNG image to Gemini and return the generated text.
-
-    Attributes:
-        (inherited) _prompt_file (Path): Path to the prompt template used for requests.
-    """
+    """Send a PNG image to Gemini and return the generated text."""
 
     def __init__(self):
         """Initialize gemini"""
