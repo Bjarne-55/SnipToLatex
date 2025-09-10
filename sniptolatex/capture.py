@@ -12,7 +12,8 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from PyQt5.QtCore import QPoint, QRect, Qt, QBuffer, QByteArray, QIODevice, QObject, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QGuiApplication, QPixmap, QPainter
 
-from .ai import GeminiRequest
+from .ai import create_request
+from .config import get_selected_model
 from .toast import Toast
 
 
@@ -85,11 +86,12 @@ def capture_and_copy(capture_rect: QRect) -> None:
         cropped_png = pixmap_to_png_bytes(cropped)
 
         # Send to Gemini in background to avoid blocking the UI
-        print("Sending to Gemini")
+        print("Sending to model")
         _clipboard_bridge.show_loading()
-        gemini = GeminiRequest()
+        model_name = get_selected_model()
+        request = create_request(model_name)
         executor = ThreadPoolExecutor()
-        future = executor.submit(gemini.send_image, cropped_png)
+        future = executor.submit(request.send_image, cropped_png)
         future.add_done_callback(copy_response)
 
 def copy_response(future: Future) -> None:
@@ -170,5 +172,4 @@ def pixmap_to_png_bytes(pixmap: QPixmap) -> Optional[bytes]:
     if not ok:
         return None
     return bytes(buffer_array)
-
 

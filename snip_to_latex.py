@@ -12,6 +12,7 @@ from sniptolatex.hotkeys import (
     HotkeyBridge as AppHotkeyBridge,
     start_hotkey_listener as app_start_hotkey_listener,
 )
+from sniptolatex.settings_dialog import SettingsDialog
 
 def main() -> int:
     app = QApplication(sys.argv)
@@ -39,11 +40,19 @@ def main() -> int:
         pix = QPixmap(16, 16)
         pix.fill(QColor(0, 153, 255))
         tray.setIcon(QIcon(pix))
-        # Simple context menu with Quit
+        # Simple context menu with Settings and Quit
         menu = QMenu()
+        settings_action = QAction("Settings", menu)
+        def open_settings():
+            dlg = SettingsDialog()
+            dlg.exec_()
+        settings_action.triggered.connect(open_settings)
+        menu.addAction(settings_action)
+
         quit_action = QAction("Quit", menu)
         quit_action.triggered.connect(app.quit)
         menu.addAction(quit_action)
+
         tray.setContextMenu(menu)
         tray.setToolTip("SnipToLatex: Press Win+Shift+C")
         tray.show()
