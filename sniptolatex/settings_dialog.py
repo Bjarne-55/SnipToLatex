@@ -1,8 +1,8 @@
 """Modern Settings dialog for SnipToLatex (PyQt6).
 
 Design follows the dark, card-based layout in DesignTemplates/SettingsMenu,
-with a segmented model selector, API key field with show/hide,
-and a prompt editor with reset.
+with a segmented model selector, API key field with show/hide eye icon button,
+and a prompt editor toolbar with undo/redo/restore/delete actions.
 """
 
 from typing import Optional
@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QFrame,
 )
+from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QButtonGroup
 from pathlib import Path
 
@@ -115,6 +116,35 @@ class SettingsDialog(QDialog):
             QPushButton#ghost:hover { background: rgba(255,255,255,0.03); }
             QPushButton#ghost:focus { border: 1px dashed #6dd6ff; }
 
+            /* Icon-only button — matches template's .btn--icon */
+            QPushButton#iconButton {
+                min-width: 36px; min-height: 36px;
+                max-width: 36px; max-height: 36px;
+                padding: 0px;
+                border: none;
+                border-radius: 12px;
+                background: rgba(255,255,255,0.02);
+            }
+            QPushButton#iconButton:hover {
+                background: rgba(255,255,255,0.06);
+            }
+            QPushButton#iconButton:pressed {
+                margin-top: 1px;
+            }
+            QPushButton#iconButton:focus {
+                border: none; /* remove purple focus border */
+            }
+
+            /* Inactive state (we keep the button enabled to allow cursor change) */
+            QPushButton#iconButton[inactive="true"] {
+                background: rgba(255,255,255,0.02);
+                border: none;
+            }
+            QPushButton#iconButton[inactive="true"]:hover {
+                /* Suppress hover highlight when inactive */
+                background: rgba(255,255,255,0.02);
+            }
+
             /* Muted labels */
             #muted { color: #8a97a5; font-size: 13px; }
             #title { font-size: 22px; font-weight: 700; margin: 0; }
@@ -195,14 +225,19 @@ class SettingsDialog(QDialog):
         self.txt_key = QLineEdit(card_key)
         self.txt_key.setPlaceholderText("Enter API key for selected model")
         self.txt_key.setEchoMode(QLineEdit.EchoMode.Password)
+        # Match template height
+        self.txt_key.setFixedHeight(36)
         # Label: Key for <Model>
         self._lbl_key_for = QLabel("Key for Model", card_key)
         self._lbl_key_for.setObjectName("muted")
-        # Show/Hide button
-        self._btn_toggle_key = QPushButton("Show", card_key)
-        self._btn_toggle_key.setObjectName("ghost")
-        self._btn_toggle_key.setFixedHeight(self.txt_key.sizeHint().height())
-        self._btn_toggle_key.setMinimumWidth(72)
+        # Show/Hide button (icon-only like template)
+        self._btn_toggle_key = QPushButton("", card_key)
+        self._btn_toggle_key.setObjectName("iconButton")
+        self._btn_toggle_key.setToolTip("Show/Hide API key")
+        self._eye_icon = self._load_icon("eye.svg")
+        self._eye_off_icon = self._load_icon("eye-off.svg")
+        if not self._eye_icon.isNull():
+            self._btn_toggle_key.setIcon(self._eye_icon)
         self._btn_toggle_key.clicked.connect(self._toggle_key_visibility)
         row_key = QHBoxLayout()
         row_key.setSpacing(8)
@@ -212,8 +247,7 @@ class SettingsDialog(QDialog):
         col_key.addWidget(self._lbl_key_for)
         col_key.addLayout(row_key)
         root.addWidget(card_key)
-        # Ensure the toggle button matches the rendered line edit height
-        QTimer.singleShot(0, self._sync_toggle_btn_height)
+        # No need to sync heights; both are fixed to 36px to match template
 
         # (Personalization section removed)
 
@@ -233,23 +267,51 @@ class SettingsDialog(QDialog):
         header_row.addStretch(1)
         prompt_v.addLayout(header_row)
 
-        # Toolbar: left label and right reset button
+        # Toolbar: left label and right action buttons
         toolbar = QHBoxLayout()
         toolbar.setSpacing(8)
         self._lbl_prompt_for = QLabel("Editing prompt for Model", prompt_card)
         self._lbl_prompt_for.setObjectName("muted")
         toolbar.addWidget(self._lbl_prompt_for)
         toolbar.addStretch(1)
-        self.btn_reset = QPushButton("Reset to default", prompt_card)
-        self.btn_reset.setObjectName("ghost")
-        self.btn_reset.clicked.connect(self._reset_prompt_to_default)
-        toolbar.addWidget(self.btn_reset)
+        # Actions: undo, redo, restore (last saved), delete (default from txt)
+        self.btn_undo = QPushButton("", prompt_card)
+        self.btn_undo.setObjectName("iconButton")
+        self.btn_undo.setToolTip("Undo")
+        self.btn_undo.setIcon(self._load_icon("undo.svg"))
+        self.btn_undo.clicked.connect(self._on_undo)
+        toolbar.addWidget(self.btn_undo)
+
+        self.btn_redo = QPushButton("", prompt_card)
+        self.btn_redo.setObjectName("iconButton")
+        self.btn_redo.setToolTip("Redo")
+        self.btn_redo.setIcon(self._load_icon("redo.svg"))
+        self.btn_redo.clicked.connect(self._on_redo)
+        toolbar.addWidget(self.btn_redo)
+
+        self.btn_restore = QPushButton("", prompt_card)
+        self.btn_restore.setObjectName("iconButton")
+        self.btn_restore.setToolTip("Restore last saved prompt")
+        self.btn_restore.setIcon(self._load_icon("restore.svg"))
+        self.btn_restore.clicked.connect(self._restore_last_saved)
+        toolbar.addWidget(self.btn_restore)
+
+        self.btn_delete = QPushButton("", prompt_card)
+        self.btn_delete.setObjectName("iconButton")
+        self.btn_delete.setToolTip("Replace with default prompt")
+        self.btn_delete.setIcon(self._load_icon("trash.svg"))
+        self.btn_delete.clicked.connect(self._reset_prompt_to_default)
+        toolbar.addWidget(self.btn_delete)
         prompt_v.addLayout(toolbar)
 
         self.txt_prompt = QPlainTextEdit(prompt_card)
         self.txt_prompt.setPlaceholderText("Edit the prompt sent to the model...")
         self.txt_prompt.setTabChangesFocus(False)
         self.txt_prompt.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.txt_prompt.setUndoRedoEnabled(True)
+        # Keep icon buttons in sync with undo/redo availability and cursor/tooltips
+        self.txt_prompt.undoAvailable.connect(self._update_undo_state)
+        self.txt_prompt.redoAvailable.connect(self._update_redo_state)
         prompt_v.addWidget(self.txt_prompt, 1)
         root.addWidget(prompt_card, 1)
 
@@ -283,6 +345,12 @@ class SettingsDialog(QDialog):
         # Ensure all buttons use the pointing-hand cursor on hover
         self._apply_pointer_cursor()
 
+        # Initialize undo/redo buttons state
+        self._can_undo = False
+        self._can_redo = False
+        self._update_undo_state(False)
+        self._update_redo_state(False)
+
     def _apply_pointer_cursor(self) -> None:
         """Set pointing-hand cursor for all buttons in the dialog."""
         for btn in self.findChildren(QPushButton):
@@ -291,13 +359,15 @@ class SettingsDialog(QDialog):
             except Exception:
                 pass
 
-    def _sync_toggle_btn_height(self) -> None:
+    def _icon_path(self, name: str) -> Path:
+        return Path(__file__).parent / "assets" / "icons" / name
+
+    def _load_icon(self, name: str) -> QIcon:
         try:
-            h = max(self.txt_key.height(), self.txt_key.sizeHint().height())
-            if h > 0:
-                self._btn_toggle_key.setFixedHeight(h)
+            path = self._icon_path(name)
+            return QIcon(str(path))
         except Exception:
-            pass
+            return QIcon()
 
     def _default_prompt_for(self, model: str) -> str:
         name = "chatgpt_image_to_latex.txt" if model == "chatgpt" else "gemini_image_to_latex.txt"
@@ -315,6 +385,9 @@ class SettingsDialog(QDialog):
             self._segment_buttons[value].setChecked(True)
         self._on_segmented_changed()
         self._load_values_for_model(value)
+        # Reset undo/redo state after loading content
+        self._update_undo_state(False)
+        self._update_redo_state(False)
 
     def _load_values_for_model(self, model: str) -> None:
         cfg = read_model_settings(model)
@@ -328,6 +401,14 @@ class SettingsDialog(QDialog):
     def _reset_prompt_to_default(self) -> None:
         model = self.current_model()
         self.txt_prompt.setPlainText(self._default_prompt_for(model))
+
+    def _restore_last_saved(self) -> None:
+        model = self.current_model()
+        cfg = read_model_settings(model)
+        stored = cfg.get("prompt")
+        if stored is None or len(stored) == 0:
+            stored = self._default_prompt_for(model)
+        self.txt_prompt.setPlainText(stored)
 
     def _on_segmented_changed(self) -> None:
         model = self.current_model()
@@ -353,10 +434,54 @@ class SettingsDialog(QDialog):
     def _toggle_key_visibility(self) -> None:
         if self.txt_key.echoMode() == QLineEdit.EchoMode.Password:
             self.txt_key.setEchoMode(QLineEdit.EchoMode.Normal)
-            self._btn_toggle_key.setText("Hide")
+            if not self._eye_off_icon.isNull():
+                self._btn_toggle_key.setIcon(self._eye_off_icon)
         else:
             self.txt_key.setEchoMode(QLineEdit.EchoMode.Password)
-            self._btn_toggle_key.setText("Show")
+            if not self._eye_icon.isNull():
+                self._btn_toggle_key.setIcon(self._eye_icon)
+
+    def _on_undo(self) -> None:
+        try:
+            if getattr(self, "_can_undo", False):
+                self.txt_prompt.undo()
+            else:
+                QApplication.beep()
+        except Exception:
+            pass
+
+    def _on_redo(self) -> None:
+        try:
+            if getattr(self, "_can_redo", False):
+                self.txt_prompt.redo()
+            else:
+                QApplication.beep()
+        except Exception:
+            pass
+
+    def _set_icon_btn_cursor(self, btn: QPushButton, enabled: bool) -> None:
+        try:
+            btn.setCursor(Qt.CursorShape.PointingHandCursor if enabled else Qt.CursorShape.ForbiddenCursor)
+            # Update tooltip hint
+            if btn is self.btn_undo:
+                btn.setToolTip("Undo" if enabled else "Nothing to undo")
+            elif btn is self.btn_redo:
+                btn.setToolTip("Redo" if enabled else "Nothing to redo")
+            # reflect inactive state for styling and hover suppression
+            btn.setProperty("inactive", not enabled)
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
+            btn.update()
+        except Exception:
+            pass
+
+    def _update_undo_state(self, available: bool) -> None:
+        self._can_undo = bool(available)
+        self._set_icon_btn_cursor(self.btn_undo, self._can_undo)
+
+    def _update_redo_state(self, available: bool) -> None:
+        self._can_redo = bool(available)
+        self._set_icon_btn_cursor(self.btn_redo, self._can_redo)
 
     def _save(self) -> None:
         model = self.current_model()
