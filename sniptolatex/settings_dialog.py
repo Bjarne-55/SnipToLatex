@@ -3,7 +3,6 @@
 Features:
 - Model selector (Gemini, ChatGPT placeholder)
 - Model-specific API key
-- Personalization: Force no bold (\mathbf)
 - Prompt editor with save support
 """
 
@@ -16,7 +15,6 @@ from PyQt5.QtWidgets import (
     QLabel,
     QComboBox,
     QLineEdit,
-    QCheckBox,
     QPlainTextEdit,
     QDialogButtonBox,
     QWidget,
@@ -56,7 +54,6 @@ class SettingsDialog(QDialog):
             QLabel { color: #222; font-size: 14px; }
             QLineEdit, QPlainTextEdit, QComboBox { font-size: 14px; }
             QLineEdit, QPlainTextEdit, QComboBox { background: #fff; border: 1px solid #cfcfcf; border-radius: 6px; padding: 6px; }
-            QCheckBox { font-size: 14px; }
             #title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
             #subtitle { color: #666; margin-bottom: 18px; }
             #groupLabel { font-weight: 600; color: #333; }
@@ -99,14 +96,7 @@ class SettingsDialog(QDialog):
         root.addLayout(row_key)
 
         # Personalization
-        row_personal = QVBoxLayout()
-        lbl_personal = QLabel("Personalization", self)
-        lbl_personal.setObjectName("groupLabel")
-        self.chk_no_bold = QCheckBox("Force no bold (\\mathbf) in output", self)
-        row_personal.addWidget(lbl_personal)
-        row_personal.addWidget(self.chk_no_bold)
-        self.chk_no_bold.toggled.connect(self._on_no_bold_toggled)
-        root.addLayout(row_personal)
+        # (Removed: Force no bold checkbox)
 
         # Prompt editor
         # Prompt header with reset button
@@ -150,10 +140,6 @@ class SettingsDialog(QDialog):
         cfg = read_model_settings(model)
         self.txt_key.setText(cfg.get("api_key") or "")
 
-        force_no_bold = cfg.get("force_no_bold")
-        # Default True if not set to preserve existing behavior
-        self.chk_no_bold.setChecked(True if force_no_bold is None else (force_no_bold.lower() == "true"))
-
         # Load stored prompt or default prompt
         stored = cfg.get("prompt")
         raw = stored if (stored is not None and len(stored) > 0) else self._default_prompt_for(model)
@@ -162,10 +148,6 @@ class SettingsDialog(QDialog):
     def _reset_prompt_to_default(self) -> None:
         model = self.cmb_model.currentData()
         self.txt_prompt.setPlainText(self._default_prompt_for(model))
-
-    def _on_no_bold_toggled(self, checked: bool) -> None:
-        pass
-        #do nothing currently
 
     def _on_model_changed(self, _idx: int) -> None:
         self._load_values_for_model(self.cmb_model.currentData())
@@ -179,6 +161,5 @@ class SettingsDialog(QDialog):
             model,
             api_key=self.txt_key.text().strip(),
             prompt=self.txt_prompt.toPlainText(),
-            force_no_bold=self.chk_no_bold.isChecked(),
         )
         self.accept()

@@ -5,7 +5,6 @@ Provides read/write helpers for application- and model-level settings:
  - Per-model sections named ``[model.<name>]`` with keys:
      - ``api_key``: string
      - ``prompt``: string (the effective prompt; if absent, default prompt file is used)
-     - ``force_no_bold``: bool as ``true``/``false`` (optional; defaults to true)
 """
 
 import os
@@ -71,18 +70,15 @@ def _model_section(model: str) -> str:
 def read_model_settings(model: str) -> Dict[str, Optional[str]]:
     """Return per-model settings dict.
 
-    Keys: 'api_key' (str|None), 'prompt' (str|None), 'force_no_bold' (str|None)
-    The 'force_no_bold' is returned as 'true'/'false' string or None if unset.
+    Keys: 'api_key' (str|None), 'prompt' (str|None)
     """
     parser = _load_parser()
     section = _model_section(model)
     api_key = parser.get(section, "api_key", fallback=None)
     prompt_value = parser.get(section, "prompt", fallback=None)
-    force_no_bold = parser.get(section, "force_no_bold", fallback=None)
     return {
         "api_key": api_key,
         "prompt": prompt_value,
-        "force_no_bold": force_no_bold,
     }
 
 
@@ -91,7 +87,6 @@ def write_model_settings(
     *,
     api_key: Optional[str] = None,
     prompt: Optional[str] = None,
-    force_no_bold: Optional[bool] = None,
 ) -> None:
     """Persist per-model settings; pass None to leave fields unchanged."""
     parser = _load_parser()
@@ -102,6 +97,4 @@ def write_model_settings(
         parser.set(section, "api_key", api_key)
     if prompt is not None:
         parser.set(section, "prompt", prompt)
-    if force_no_bold is not None:
-        parser.set(section, "force_no_bold", "true" if force_no_bold else "false")
     _save_parser(parser)
