@@ -13,7 +13,7 @@ authors = [
 ]
 dependencies = [
   "pynput==1.7.7",
-  "PyQt5==5.15.11",
+  "PyQt6==6.7.0",
   "google-generativeai==0.7.2",
 ]
 
@@ -33,5 +33,4 @@ sniptolatex = ["ai/prompts/*.txt"]
 [tool.setuptools.data-files]
 # Ensure a default config directory is created in wheels (empty file will be created at runtime anyway)
 # Not strictly necessary, but keeps packaging explicit.
-
 

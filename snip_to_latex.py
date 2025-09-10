@@ -2,9 +2,9 @@
 import sys
 import signal
 import threading
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
-from PyQt5.QtGui import QIcon, QPixmap, QColor
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PyQt6.QtGui import QIcon, QPixmap, QColor, QAction
 
 # Use modular implementations
 from sniptolatex.controller import Controller as AppController
@@ -45,7 +45,7 @@ def main() -> int:
         settings_action = QAction("Settings", menu)
         def open_settings():
             dlg = SettingsDialog()
-            dlg.exec_()
+            dlg.exec()
         settings_action.triggered.connect(open_settings)
         menu.addAction(settings_action)
 
@@ -57,7 +57,7 @@ def main() -> int:
         tray.setToolTip("SnipToLatex: Press Win+Shift+C")
         tray.show()
     print("Listening for Super+Shift+C ...")
-    code = app.exec_()
+    code = app.exec()
 
     try:
         listener.stop()

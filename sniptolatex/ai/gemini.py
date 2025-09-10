@@ -1,7 +1,6 @@
 """Gemini model request implementation."""
 
 import os
-from PyQt5.QtGui import QPixmap
 
 from .request import Request
 

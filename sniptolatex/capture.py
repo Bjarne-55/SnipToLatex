@@ -1,4 +1,4 @@
-"""Screen capture and clipboard helpers.
+"""Screen capture and clipboard helpers (PyQt6).
 
 This module provides utilities to:
 - Capture a stitched screenshot of all screens
@@ -9,8 +9,8 @@ This module provides utilities to:
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, Future
 
-from PyQt5.QtCore import QPoint, QRect, Qt, QBuffer, QByteArray, QIODevice, QObject, pyqtSignal, pyqtSlot
-from PyQt5.QtGui import QGuiApplication, QPixmap, QPainter
+from PyQt6.QtCore import QPoint, QRect, Qt, QBuffer, QByteArray, QIODevice, QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QGuiApplication, QPixmap, QPainter
 
 from .ai import create_request
 from .config import get_selected_model
@@ -140,7 +140,7 @@ def grab_full_desktop_pixmap() -> Optional[QPixmap]:
         return None
 
     composed = QPixmap(virtual_rect.size())
-    composed.fill(Qt.transparent)
+    composed.fill(Qt.GlobalColor.transparent)
 
     # Paint each screen's snapshot into the composed canvas at its offset
     with QPainter(composed) as painter:
@@ -165,11 +165,10 @@ def pixmap_to_png_bytes(pixmap: QPixmap) -> Optional[bytes]:
     """
     buffer_array = QByteArray()
     buffer = QBuffer(buffer_array)
-    if not buffer.open(QIODevice.WriteOnly):
+    if not buffer.open(QIODevice.OpenModeFlag.WriteOnly):
         return None
     ok = pixmap.save(buffer, 'PNG')
     buffer.close()
     if not ok:
         return None
     return bytes(buffer_array)
-

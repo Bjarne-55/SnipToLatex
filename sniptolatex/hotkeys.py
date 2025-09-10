@@ -1,7 +1,7 @@
-"""Global hotkey bridge using pynput."""
+"""Global hotkey bridge using pynput (PyQt6)."""
 
 from pynput import keyboard
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 
 class HotkeyBridge(QObject):
@@ -32,5 +32,4 @@ def start_hotkey_listener(bridge: HotkeyBridge) -> keyboard.GlobalHotKeys:
         '<cmd>+<shift>+c': on_activate,
     })
     return listener
-
 
