@@ -1,4 +1,4 @@
-"""Toast/notification widget.
+"""Toast/notification widget (PyQt6).
 
 This module provides a small, frameless toast used to communicate short, transient
 status information near the bottom center of the primary screen. It exposes two
@@ -8,9 +8,9 @@ The implementation is intentionally minimal and self-contained so it can be
 reused from anywhere in the application without additional windows.
 """
 
-from PyQt5.QtCore import Qt, QTimer, QPropertyAnimation, QSize
-from PyQt5.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout, QSpacerItem, QSizePolicy
-from PyQt5.QtGui import QMovie, QPixmap
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize
+from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout, QSpacerItem, QSizePolicy
+from PyQt6.QtGui import QMovie, QPixmap, QGuiApplication
 from pathlib import Path
 
 # Consistent icon size used for spinner and success icon
@@ -40,7 +40,8 @@ class Toast(QWidget):
         Args:
             parent: Optional parent widget used for window ownership only.
         """
-        super().__init__(parent, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self._configure_window()
         self._build_ui()
         self._setup_behavior()
@@ -48,8 +49,8 @@ class Toast(QWidget):
 
     def _configure_window(self) -> None:
         """Configure window flags and attributes for a frameless, floating UI."""
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setWindowFlag(Qt.NoDropShadowWindowHint, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setWindowFlag(Qt.WindowType.NoDropShadowWindowHint, True)
 
     def _build_ui(self) -> None:
         """Create the card and its internal content layout (icon + text)."""
@@ -76,10 +77,10 @@ class Toast(QWidget):
         row = QHBoxLayout()
         row.setContentsMargins(16, 0, 16, 0)
         row.setSpacing(10)
-        row.setAlignment(Qt.AlignVCenter)
+        row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self._icon = QLabel(parent)
-        self._icon.setAlignment(Qt.AlignCenter)
+        self._icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._icon.setFixedSize(ICON_SIZE)
 
         self._text = QLabel(parent)
@@ -87,10 +88,10 @@ class Toast(QWidget):
 
         row.addWidget(self._icon)
         row.addWidget(self._text)
-        row.addItem(QSpacerItem(10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        row.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
 
         content_layout.addLayout(row)
-        content_layout.setAlignment(row, Qt.AlignVCenter)
+        content_layout.setAlignment(row, Qt.AlignmentFlag.AlignVCenter)
 
     def _setup_behavior(self) -> None:
         """Initialize timers and animations used by the toast behavior."""
@@ -113,8 +114,6 @@ class Toast(QWidget):
         The widget is horizontally centered with a small horizontal padding to
         avoid screen edges, and vertically positioned slightly above the bottom.
         """
-        from PyQt5.QtGui import QGuiApplication
-
         screen = QGuiApplication.primaryScreen()
         geo = screen.availableGeometry()
         self.adjustSize()
@@ -182,10 +181,13 @@ class Toast(QWidget):
         Returns:
             QMovie: The spinner animation sized to ``ICON_SIZE``.
         """
-        resource_path = Path(__file__).parent / "resources" / "Rolling@1x-3.3s-200px-200px.gif"
-        movie = QMovie(str(resource_path))
-        movie.setScaledSize(ICON_SIZE)
-        return movie
+        candidate = Path(__file__).parent / "assets" / "media" / "Rolling@1x-3.3s-200px-200px.gif"
+        mv = QMovie(str(candidate)) if candidate.exists() else QMovie()
+        if getattr(mv, "isValid", None) and mv.isValid():
+            mv.setScaledSize(ICON_SIZE)
+            return mv
+        # As a last resort, return an empty movie to avoid crashes
+        return QMovie()
 
     def _load_check_icon(self) -> QPixmap:
         """Load and scale the success check icon.
@@ -193,8 +195,10 @@ class Toast(QWidget):
         Returns:
             QPixmap: The success icon pixmap scaled to ``ICON_SIZE``.
         """
-        resource_path = Path(__file__).parent / "resources" / "check.svg"
-        pixmap = QPixmap(str(resource_path)).scaled(ICON_SIZE, Qt.KeepAspectRatio, transformMode=Qt.SmoothTransformation)
+        resource_path = Path(__file__).parent / "assets" / "icons" / "check.svg"
+        pixmap = QPixmap(str(resource_path)).scaled(
+            ICON_SIZE,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            transformMode=Qt.TransformationMode.SmoothTransformation,
+        )
         return pixmap
-
-

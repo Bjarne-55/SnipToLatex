@@ -1,0 +1,134 @@
+/* SettingsDialog stylesheet extracted to external QSS.
+   All colors are referenced via @tokens and replaced at runtime. */
+
+/* Subtle dialog background using a gradient*/
+QDialog {
+    background: qradialgradient(
+        cx: 0.12, cy: -0.10, fx: 0.12, fy: -0.10, radius: 1.15,
+        stop: 0 @glow-purple-12,  /* softer purple glow */
+        stop: 0.45 @glow-purple-03,
+        stop: 0.70 @black-00,     /* fade out */
+        stop: 1 @bg-base          /* base background */
+    );
+    color: @fg-text;
+}
+QLabel { color: @fg-text; font-size: 26px; }
+
+/* Cards */
+QFrame#header {
+    background-color: @white-02;
+    border: 1px solid @border;
+    border-radius: 14px;
+    padding: 16px 18px;
+}
+QFrame#card {
+    background-color: @white-02;
+    border: 1px solid @border;
+    border-radius: 14px;
+    padding: 16px;
+}
+
+/* Inputs */
+QLineEdit, QPlainTextEdit {
+    font-size: 14px;
+    color: @fg-text;
+    background: @input-bg;
+    border: 1px solid @border;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+QLineEdit:focus, QPlainTextEdit:focus {
+    border: 1px solid @accent-violet;
+}
+QPlainTextEdit { font-family: Consolas, "SF Mono", Menlo, Monaco, "Courier New", monospace; }
+
+/* Segmented */
+#segmented { background: @input-bg; border: 1px solid @border; border-radius: 12px; padding: 4px; }
+#segmented QPushButton {
+    background: transparent; color: @fg-text; border: none; border-radius: 10px; padding: 10px 12px; min-width: 110px;
+}
+#segmented QPushButton:hover { background: @white-04; }
+#segmented QPushButton:checked {
+    background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 @cyan-14, stop:1 @violet-14);
+    border: 1px solid @violet-35;
+}
+
+/* Footer + Buttons */
+QFrame#footer { padding-top: 12px; margin-top: 4px; }
+QDialogButtonBox QPushButton {
+    min-height: 36px; min-width: 96px;
+    padding: 10px 16px; border-radius: 12px; font-weight: 600;
+    border: 1px solid @border; background: @white-03; color: @fg-text;
+}
+QDialogButtonBox QPushButton:hover { background: @white-06; }
+QPushButton#primary { border: none; background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 @accent-cyan, stop:1 @accent-violet); color: @bg-base; font-weight: 700; }
+/* Ghost buttons for subtle actions (dashed border like Design_Menu) */
+QPushButton#ghost {
+    background: transparent;
+    border: 1px dashed @border;
+    border-radius: 10px;
+    padding: 6px 12px;
+    color: @fg-text;
+}
+QPushButton#ghost:hover { background: @white-03; }
+QPushButton#ghost:focus { border: 1px dashed @accent-cyan; }
+
+/* Icon-only button — matches template's .btn--icon */
+QPushButton#iconButton {
+    min-width: 36px; min-height: 36px;
+    max-width: 36px; max-height: 36px;
+    padding: 0px;
+    border: none;
+    border-radius: 12px;
+    background: @white-02;
+}
+QPushButton#iconButton:hover {
+    background: @white-06;
+}
+QPushButton#iconButton:pressed {
+    margin-top: 1px;
+}
+QPushButton#iconButton:focus {
+    border: none; /* remove purple focus border */
+}
+
+/* Inactive state (we keep the button enabled to allow cursor change) */
+QPushButton#iconButton[inactive="true"] {
+    background: @white-02;
+    border: none;
+}
+QPushButton#iconButton[inactive="true"]:hover {
+    /* Suppress hover highlight when inactive */
+    background: @white-02;
+}
+
+/* Muted labels */
+#muted { color: @muted-text; font-size: 13px; }
+#title { font-size: 22px; font-weight: 700; margin: 0; }
+#logo { background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 @accent-cyan, stop:1 @accent-violet); color: white; border-radius: 10px; }
+#promptHeader QLabel { color: @fg-text; }
+
+/* Global modern scrollbars within the Settings dialog */
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 6px;
+    margin: 0px;
+    border-radius: 3px;
+}
+
+QScrollBar::handle:vertical {
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 @white-06, stop:1 @white-04);
+    min-height: 20px;
+    border-radius: 3px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 @accent-cyan, stop:1 @accent-violet);;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+}

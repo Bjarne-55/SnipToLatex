@@ -1,8 +1,8 @@
-"""Thin controller to show the overlay on demand."""
+"""Thin controller to show the overlay on demand (PyQt6)."""
 
-from PyQt5.QtCore import QObject
+from PyQt6.QtCore import QObject
 
-from .overlay import SelectionOverlay
+from .ui.overlay import SelectionOverlay
 
 
 class Controller(QObject):
@@ -26,5 +26,3 @@ class Controller(QObject):
             None.
         """
         self.overlay.begin()
-
-

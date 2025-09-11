@@ -1,7 +1,10 @@
 """Configuration utilities for SnipToLatex.
 
-Creates and reads a simple INI file so users can provide their API key
-without setting environment variables.
+Provides read/write helpers for application- and model-level settings:
+ - Selected model name under section ``[sniptolatex]`` key ``model``.
+ - Per-model sections named ``[model.<name>]`` with keys:
+     - ``api_key``: string
+     - ``prompt``: string (the effective prompt; if absent, default prompt file is used)
 """
 
 import os
@@ -10,7 +13,8 @@ from typing import Dict, Optional
 
 
 _APP_DIR_NAME = "SnipToLatex"
-_SECTION = "sniptolatex"
+_SECTION_APP = "sniptolatex"
+_SECTION_MODEL_PREFIX = "model."
 
 def get_config_dir() -> str:
     """Return the user-specific configuration directory.
@@ -30,15 +34,67 @@ def get_config_path() -> str:
     return os.path.join(get_config_dir(), "config.ini")
 
 
-def read_config() -> Dict[str, Optional[str]]:
-    """Read configuration values from the INI file.
+def _ensure_config_dir() -> None:
+    os.makedirs(get_config_dir(), exist_ok=True)
 
-    Returns a dict with keys: 'api_key', 'model'. Missing keys map to None.
-    """
+
+def _load_parser() -> ConfigParser:
     parser = ConfigParser()
     parser.read(get_config_path(), encoding="utf-8")
-    api_key = parser.get(_SECTION, "api_key", fallback=None)
-    model = parser.get(_SECTION, "model", fallback=None)
-    return {"api_key": api_key, "model": model}
+    return parser
 
 
+def _save_parser(parser: ConfigParser) -> None:
+    _ensure_config_dir()
+    with open(get_config_path(), "w", encoding="utf-8") as fh:
+        parser.write(fh)
+
+
+def get_selected_model(default: str = "gemini") -> str:
+    parser = _load_parser()
+    return parser.get(_SECTION_APP, "model", fallback=default)
+
+
+def set_selected_model(model: str) -> None:
+    parser = _load_parser()
+    if not parser.has_section(_SECTION_APP):
+        parser.add_section(_SECTION_APP)
+    parser.set(_SECTION_APP, "model", model)
+    _save_parser(parser)
+
+
+def _model_section(model: str) -> str:
+    return f"{_SECTION_MODEL_PREFIX}{model}"
+
+
+def read_model_settings(model: str) -> Dict[str, Optional[str]]:
+    """Return per-model settings dict.
+
+    Keys: 'api_key' (str|None), 'prompt' (str|None)
+    """
+    parser = _load_parser()
+    section = _model_section(model)
+    api_key = parser.get(section, "api_key", fallback=None)
+    prompt_value = parser.get(section, "prompt", fallback=None)
+    return {
+        "api_key": api_key,
+        "prompt": prompt_value,
+    }
+
+
+def write_model_settings(
+    model: str,
+    *,
+    api_key: Optional[str] = None,
+    prompt: Optional[str] = None,
+) -> None:
+    """Persist per-model settings; pass None to leave fields unchanged."""
+    parser = _load_parser()
+    section = _model_section(model)
+    if not parser.has_section(section):
+        parser.add_section(section)
+    if api_key is not None:
+        parser.set(section, "api_key", api_key)
+    if prompt is not None:
+        parser.set(section, "prompt", prompt)
+    _save_parser(parser)

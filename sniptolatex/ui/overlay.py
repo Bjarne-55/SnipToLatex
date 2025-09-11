@@ -1,16 +1,15 @@
-"""Interactive full-desktop selection overlay.
+"""Interactive full-desktop selection overlay (PyQt6).
 
 This topmost frameless widget covers the virtual desktop and lets the user
 drag to select a rectangle. It dispatches the selection to the capture layer
 and then closes itself.
 """
 
-from PyQt5.QtCore import QPoint, QRect, Qt, pyqtSignal
-from PyQt5.QtGui import QColor, QGuiApplication, QMouseEvent, QPainter, QPen, QPixmap
-from PyQt5.QtWidgets import QWidget, QPushButton, QSystemTrayIcon, QMenu, QAction
+from PyQt6.QtCore import QPoint, QRect, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QGuiApplication, QMouseEvent, QPainter, QPen
+from PyQt6.QtWidgets import QWidget, QPushButton
 
-from .capture import capture_and_copy, get_virtual_geometry
-from .settings_dialog import SettingsDialog
+from ..capture import capture_and_copy, get_virtual_geometry
 
 
 class SelectionOverlay(QWidget):
@@ -24,18 +23,17 @@ class SelectionOverlay(QWidget):
         _virtual_rect (QRect): The virtual desktop rectangle covering all monitors.
         _overlay_color (QColor): Semi-transparent fill color for dimming background.
         _border_pen (QPen): Pen used to draw the selection border.
-        settings_button (QPushButton): Button to open the settings dialog.
     """
     closed = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__(None)
         self.setWindowFlags(
-            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
+            Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool
         )
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setCursor(Qt.CrossCursor)
-        self.setFocusPolicy(Qt.StrongFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setCursor(Qt.CursorShape.CrossCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         self._dragging = False
         self._start = QPoint()
@@ -44,33 +42,7 @@ class SelectionOverlay(QWidget):
         self.setGeometry(self._virtual_rect)
 
         self._overlay_color = QColor(0, 0, 0, 100)
-        self._border_pen = QPen(QColor(0, 153, 255, 220), 2, Qt.SolidLine)
-
-        self.settings_button = QPushButton("⚙", self)
-        self.settings_button.setFixedSize(32, 32)
-        self.settings_button.move(12, 12)
-        self.settings_button.setStyleSheet(
-            "QPushButton{background: rgba(20,20,20,180); color: white; border: 1px solid rgba(255,255,255,120); border-radius: 4px;}"
-            "QPushButton:hover{background: rgba(40,40,40,200);}" 
-        )
-        self.settings_button.setCursor(Qt.PointingHandCursor)
-        self.settings_button.clicked.connect(self._open_settings)
-
-    def _open_settings(self) -> None:
-        """Open the settings dialog."""
-        released = False
-        try:
-            self.releaseKeyboard()
-            released = True
-        except Exception:
-            pass
-        dlg = SettingsDialog(self)
-        dlg.exec_()
-        if released:
-            try:
-                self.grabKeyboard()
-            except Exception:
-                pass
+        self._border_pen = QPen(QColor(0, 153, 255, 220), 2, Qt.PenStyle.SolidLine)
 
     def begin(self) -> None:
         """Show the overlay across all monitors and prepare for dragging."""
@@ -86,7 +58,7 @@ class SelectionOverlay(QWidget):
             self.grabKeyboard()
         except Exception:
             pass
-        self.setFocus(Qt.MouseFocusReason)
+        self.setFocus(Qt.FocusReason.MouseFocusReason)
 
     def keyPressEvent(self, event):
         """Allow Escape to cancel the overlay.
@@ -94,7 +66,7 @@ class SelectionOverlay(QWidget):
         Args:
             event (QKeyEvent): The key event.
         """
-        if event.key() == Qt.Key_Escape:
+        if event.key() == Qt.Key.Key_Escape:
             self.close()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -103,15 +75,13 @@ class SelectionOverlay(QWidget):
         Args:
             event (QMouseEvent): The mouse press event.
         """
-        if event.button() == Qt.RightButton:
+        if event.button() == Qt.MouseButton.RightButton:
             self.close()
             return
-        if event.button() == Qt.LeftButton:
-            if self.settings_button.geometry().contains(event.pos()):
-                self.settings_button.click()
-                return
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Use Qt6 QPointF-based positions
             self._dragging = True
-            self._start = event.globalPos()
+            self._start = event.globalPosition().toPoint()
             self._end = self._start
             self.update()
 
@@ -123,7 +93,7 @@ class SelectionOverlay(QWidget):
         """
         if not self._dragging:
             return
-        self._end = event.globalPos()
+        self._end = event.globalPosition().toPoint()
         self.update()
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
@@ -132,12 +102,12 @@ class SelectionOverlay(QWidget):
         Args:
             event (QMouseEvent): The mouse release event.
         """
-        if event.button() != Qt.LeftButton:
+        if event.button() != Qt.MouseButton.LeftButton:
             return
         if not self._dragging:
             return
         self._dragging = False
-        self._end = event.globalPos()
+        self._end = event.globalPosition().toPoint()
         rect = QRect(self._start, self._end).normalized()
         capture_rect = QRect(
             rect.left() - self._virtual_rect.left(),
@@ -155,13 +125,16 @@ class SelectionOverlay(QWidget):
             _event (QPaintEvent): The paint event (unused).
         """
         painter = QPainter(self)
-        painter.setRenderHints(QPainter.Antialiasing | QPainter.HighQualityAntialiasing)
+        # Use supported PyQt6 render hints
+        painter.setRenderHints(
+            QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform
+        )
         painter.fillRect(self.rect(), self._overlay_color)
         if not self._start.isNull() and not self._end.isNull():
             rect = QRect(self.mapFromGlobal(self._start), self.mapFromGlobal(self._end)).normalized()
-            painter.setCompositionMode(QPainter.CompositionMode_Clear)
-            painter.fillRect(rect, Qt.transparent)
-            painter.setCompositionMode(QPainter.CompositionMode_SourceOver)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Clear)
+            painter.fillRect(rect, Qt.GlobalColor.transparent)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
             painter.setPen(self._border_pen)
             painter.drawRect(rect)
 
@@ -179,5 +152,3 @@ class SelectionOverlay(QWidget):
             except Exception:
                 pass
             super().closeEvent(event)
-
-

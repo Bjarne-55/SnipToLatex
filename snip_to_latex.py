@@ -2,9 +2,9 @@
 import sys
 import signal
 import threading
-from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
-from PyQt5.QtGui import QIcon, QPixmap, QColor
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
+from PyQt6.QtGui import QIcon, QPixmap, QColor, QAction
 
 # Use modular implementations
 from sniptolatex.controller import Controller as AppController
@@ -12,6 +12,7 @@ from sniptolatex.hotkeys import (
     HotkeyBridge as AppHotkeyBridge,
     start_hotkey_listener as app_start_hotkey_listener,
 )
+from sniptolatex.ui.settings_dialog import SettingsDialog
 
 def main() -> int:
     app = QApplication(sys.argv)
@@ -39,16 +40,39 @@ def main() -> int:
         pix = QPixmap(16, 16)
         pix.fill(QColor(0, 153, 255))
         tray.setIcon(QIcon(pix))
-        # Simple context menu with Quit
+        # Simple context menu with Settings and Quit
         menu = QMenu()
+        settings_action = QAction("Settings", menu)
+        # Ensure only one settings dialog at a time
+        settings_dlg = None
+        def open_settings():
+            nonlocal settings_dlg
+            if settings_dlg is not None and settings_dlg.isVisible():
+                try:
+                    settings_dlg.show()
+                    settings_dlg.raise_()
+                    settings_dlg.activateWindow()
+                except Exception:
+                    pass
+                return
+            dlg = SettingsDialog()
+            settings_dlg = dlg
+            try:
+                dlg.exec()
+            finally:
+                settings_dlg = None
+        settings_action.triggered.connect(open_settings)
+        menu.addAction(settings_action)
+
         quit_action = QAction("Quit", menu)
         quit_action.triggered.connect(app.quit)
         menu.addAction(quit_action)
+
         tray.setContextMenu(menu)
         tray.setToolTip("SnipToLatex: Press Win+Shift+C")
         tray.show()
     print("Listening for Super+Shift+C ...")
-    code = app.exec_()
+    code = app.exec()
 
     try:
         listener.stop()

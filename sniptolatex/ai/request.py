@@ -1,44 +1,45 @@
 from pathlib import Path
-from functools import lru_cache
-from PyQt5.QtGui import QPixmap
+from sniptolatex.config import read_model_settings
 
 class Request:
     """Abstract base class for prompt-driven image requests.
 
-    Attributes:
-        _prompt_file (Path): Resolved path to the prompt template file.
+    Provides per-model API key and prompt loading, with a fallback to a
+    packaged default prompt file when no stored prompt is present.
     """
 
-    def __init__(self, prompt_file_name: str):
-        """Initialize a request with a prompt file name.
+    def __init__(self, model_name: str):
+        """Initialize a request with API key and prompt for a model.
 
-        Args:
-            prompt_file_name (str): File name within the `prompts` directory
-                to load as the request prompt/template.
-
-        Raises:
-            FileNotFoundError: If the prompt file does not exist when read.
+        The prompt is loaded from per-model config key 'prompt'. If missing,
+        falls back to the packaged default prompt file for the model.
         """
-        # Prompt file looked up relative to this package's prompts directory
-        self._prompt_file = Path(__file__).parent / "prompts" / prompt_file_name
+        self._model_name = model_name
+        settings = read_model_settings(model_name)
+        self._api_key = settings.get("api_key")
+        stored_prompt = settings.get("prompt")
+        self._prompt = (
+            stored_prompt if (stored_prompt is not None and len(stored_prompt) > 0)
+            else self._read_default_prompt_file(model_name)
+        )
 
-    @lru_cache
-    def _read_prompt_from_file(self) -> str:
-        """Read and cache the prompt content.
+    def _read_default_prompt_file(self, model_name: str) -> str:
+        """Read the shipped default prompt for a model.
 
-        Returns:
-            str: Prompt contents loaded from disk.
-
-        Raises:
-            FileNotFoundError: If the prompt file path cannot be read.
+        Returns empty string if prompt file is not found.
         """
-        return self._prompt_file.read_text(encoding="utf-8")
+        name = {
+            "gemini": "gemini_image_to_latex.txt",
+            "chatgpt": "chatgpt_image_to_latex.txt",
+        }.get(model_name, "gemini_image_to_latex.txt")
+        path = Path(__file__).parent / "prompts" / name
+        return path.read_text(encoding="utf-8")
 
-    def send_image(self, image: QPixmap) -> str:
+    def send_image(self, image: bytes) -> str:
         """Send an image to a concrete model implementation and return text.
 
         Args:
-            image (QPixmap): Image to be processed by the model.
+            image (bytes): Image to be processed by the model.
 
         Returns:
             str: Model-generated text.
