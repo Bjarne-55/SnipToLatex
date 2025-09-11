@@ -14,6 +14,10 @@ QFrame#toastCard[state="success"] {
     border: 1px solid @ok-45;
 }
 
+QFrame#toastCard[state="error"] {
+    border: 1px solid @error-45;
+}
+
 /* Title + description */
 QLabel#toastTitle { color: @fg-text; font-size: 14px; font-weight: 500; }
 QLabel#toastDesc  { color: @muted-text; font-size: 12px; }

@@ -22,6 +22,7 @@ DEFAULT_COLORS: Dict[str, str] = {
     "@accent-violet": "#a48bff",
     "@ok": "#4ade80",
     "@ok-45": "rgba(74, 222, 128, 0.45)",
+    "@error-45": "rgba(239, 68, 68, 0.45)",
 
     # Whites with alpha (effects)
     "@white-02": "rgba(255,255,255,0.02)",

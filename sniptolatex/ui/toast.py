@@ -52,12 +52,15 @@ SIDE_PADDING_PX = 12
 # Timing
 FADE_OUT_MS = 180
 AUTO_DISMISS_MS = 1500
+ERROR_DISMISS_MS = 2500
 
 # Colors (keep centralized for easy theme changes)
 COLOR_ACCENT_CYAN = get_QColor('@accent-cyan')
 COLOR_ACCENT_VIOLET = get_QColor('@accent-violet')
 COLOR_SUCCESS = get_QColor('@ok')
 COLOR_SUCCESS_45 = get_QColor('@ok-45')
+COLOR_ERROR = get_QColor('@error')
+COLOR_ERROR_45 = get_QColor('@error-45')
 SUCCESS_GLOW_ALPHA = 0.45
 SUCCESS_GLOW_BLUR = 8
 
@@ -237,6 +240,33 @@ class _CheckIcon(QWidget):
         p.drawPath(partial)
 
 
+class _ErrorIcon(QWidget):
+    """Simple error icon (circle with exclamation)."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(CHECK_SIZE)
+
+    def paintEvent(self, _) -> None:  # type: ignore[override]
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        w, h = self.width(), self.height()
+        r = min(w, h)
+        cx, cy = w / 2.0, h / 2.0
+
+        penCircle = QPen(COLOR_ERROR)
+        penCircle.setWidthF(2.0)
+        p.setPen(penCircle)
+        p.drawEllipse(QRectF(1.5, 1.5, r - 3.0, r - 3.0))
+
+        penMark = QPen(COLOR_ERROR)
+        penMark.setWidthF(2.2)
+        penMark.setCapStyle(Qt.PenCapStyle.RoundCap)
+        p.setPen(penMark)
+        p.drawLine(QPointF(cx, cy - r * 0.25), QPointF(cx, cy + r * 0.10))
+        p.drawPoint(QPointF(cx, cy + r * 0.28))
+
+
 class Toast(QWidget):
     """Frameless floating toast widget.
 
@@ -312,9 +342,12 @@ class Toast(QWidget):
 
         self._spinner = _Spinner(self._icon_wrap)
         self._check = _CheckIcon(self._icon_wrap)
+        self._error = _ErrorIcon(self._icon_wrap)
         self._check.hide()
+        self._error.hide()
         icon_layout.addWidget(self._spinner)
         icon_layout.addWidget(self._check)
+        icon_layout.addWidget(self._error)
 
         text_col = QVBoxLayout()
         text_col.setContentsMargins(0, 0, 0, 0)
@@ -370,9 +403,10 @@ class Toast(QWidget):
         The toast remains visible until another state is shown or it is
         programmatically hidden.
         """
-        # Spinner visible, check hidden
+        # Spinner visible, icons reset
         self._spinner.show()
         self._check.hide()
+        self._error.hide()
         self._title.setText("Sending to model…")
         self._desc.setText("Waiting for a response")
         # Remove success glow and update border state
@@ -397,6 +431,7 @@ class Toast(QWidget):
         self._spinner.hide()
         self._check.show()
         self._check.start()
+        self._error.hide()
         self._title.setText("Success")
         self._desc.setText("Response copied to clipboard")
         # Add a subtle green glow around the card
@@ -430,3 +465,33 @@ class Toast(QWidget):
             self._fade_anim.finished.disconnect(_on_finished)
         self._fade_anim.finished.connect(_on_finished)
         self._fade_anim.start()
+
+    def show_error(self, title: str = "Error", desc: str = "Something went wrong") -> None:
+        """Show an error state (red icon and glow) and auto-dismiss.
+
+        Args:
+            title: Short title shown on the first line.
+            desc: Additional description on the second line.
+        """
+        self._spinner.hide()
+        self._check.hide()
+        self._error.show()
+        self._title.setText(title)
+        self._desc.setText(desc)
+
+        glow = QGraphicsDropShadowEffect(self)
+        glow.setBlurRadius(SUCCESS_GLOW_BLUR)
+        glow.setXOffset(0)
+        glow.setYOffset(0)
+        glow.setColor(COLOR_ERROR_45 if COLOR_ERROR_45.isValid() else color_with_alpha(COLOR_ERROR, 0.45))
+        self._card.setGraphicsEffect(glow)
+        self._success_glow = glow
+        self._card.setProperty("state", "error")
+        self._card.style().unpolish(self._card)
+        self._card.style().polish(self._card)
+
+        self.setWindowOpacity(1.0)
+        self.show()
+        self.raise_()
+        self._place_bottom_center()
+        self._close_timer.start(ERROR_DISMISS_MS)

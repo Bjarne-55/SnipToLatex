@@ -3,9 +3,11 @@
 import os
 
 from .request import Request
+from .errors import ApiKeyMissing, SdkMissing, EmptyResponse, InvalidApiKey
 
 try:
     import google.generativeai as genai
+    from google.api_core.exceptions import InvalidArgument
 except Exception:
     genai = None
 
@@ -29,23 +31,26 @@ class GeminiRequest(Request):
             unavailable, the API key is missing, or the response has no text.
         """
         if genai is None:
-            print("Gemini SDK not installed. Skipping send.")
-            return
+            raise SdkMissing("Gemini SDK not installed")
         # Ensure config exists and try to read API key from it first
 
         if not self._api_key:
-            print("GEMINI_API_KEY/GOOGLE_API_KEY not set. Skipping send.")
-            return
+            raise ApiKeyMissing("Missing Gemini API key")
         try:
             genai.configure(api_key=self._api_key)
             model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
             model = genai.GenerativeModel(model_name)
             image_part = {"mime_type": "image/png", "data": image}
             resp = model.generate_content([self._prompt, image_part])
-            text = getattr(resp, "text", None)
-            if text:
-                return text
+            try:
+                text = getattr(resp, "text", None)
+            except AttributeError:
+                raise EmptyResponse("Model returned no text")
+            return text
+        except ValueError:
+            raise EmptyResponse("Model returned no text")
+        except InvalidArgument as exp:
+            if exp.reason == "API_KEY_INVALID":
+                raise InvalidApiKey("API key not valid.")
             else:
-                print("Gemini: response received (no text)")
-        except Exception as exc:
-            print("Gemini error:", exc)
+                raise exp

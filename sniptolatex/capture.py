@@ -7,12 +7,14 @@ This module provides utilities to:
 """
 
 from typing import Optional
+from .util.app_logging import append_log
 from concurrent.futures import ThreadPoolExecutor, Future
 
 from PyQt6.QtCore import QPoint, QRect, Qt, QBuffer, QByteArray, QIODevice, QObject, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QGuiApplication, QPixmap, QPainter
 
 from .ai import create_request
+from .ai.errors import ApiKeyMissing, SdkMissing, EmptyResponse, InvalidApiKey
 from .config import get_selected_model
 from .ui.toast import Toast
 
@@ -27,11 +29,13 @@ class _ClipboardBridge(QObject):
 
     _copyRequested = pyqtSignal(str)
     _toastSuccessRequested = pyqtSignal()
+    _toastErrorRequested = pyqtSignal(str, str)
 
     def __init__(self) -> None:
         super().__init__()
         self._copyRequested.connect(self._set_clipboard_text)
         self._toastSuccessRequested.connect(self._show_toast_success)
+        self._toastErrorRequested.connect(self._show_toast_error)
 
         # Lazily create UI elements only after QApplication exists
         self._toast = None
@@ -52,6 +56,9 @@ class _ClipboardBridge(QObject):
     def request_toast_success(self) -> None:
         self._toastSuccessRequested.emit()
 
+    def request_toast_error(self, title: str, desc: str) -> None:
+        self._toastErrorRequested.emit(title, desc)
+
     @pyqtSlot(str)
     def _set_clipboard_text(self, text: str) -> None:
         QGuiApplication.clipboard().setText(text)
@@ -60,6 +67,11 @@ class _ClipboardBridge(QObject):
         self._ensure_toast()
         if self._toast is not None:
             self._toast.show_success()
+
+    def _show_toast_error(self, title: str, desc: str) -> None:
+        self._ensure_toast()
+        if self._toast is not None:
+            self._toast.show_error(title, desc)
 
 
 # Singleton living in the main thread (module imported on main thread)
@@ -106,11 +118,27 @@ def copy_response(future: Future) -> None:
             if the background task failed.
     """
     # This callback runs in a worker thread. Do not touch GUI directly here.
-    result = future.result()
+    try:
+        result = future.result()
+    except ApiKeyMissing:
+        _clipboard_bridge.request_toast_error("Missing API key", "Set your API key in Settings")
+        return
+    except SdkMissing:
+        _clipboard_bridge.request_toast_error("Model SDK missing", "Install the SDK in your environment")
+        return
+    except EmptyResponse:
+        _clipboard_bridge.request_toast_error("No response", "Model returned no text")
+        return
+    except InvalidApiKey:
+        _clipboard_bridge.request_toast_error("API key not valid", "Change API key in Settings")
+        return
+    except Exception as exc:
+        append_log("Unhandled exception in model request", exc)
+        _clipboard_bridge.request_toast_error("Something went wrong", "Look at logs")
+        return
+
     print(f"Model result: {result}")
-    # Forward clipboard write to main thread to avoid CO_E_NOTINITIALIZED on Windows
     _clipboard_bridge.request_copy(result)
-    # Show success toast on the main thread
     _clipboard_bridge.request_toast_success()
 
 def get_virtual_geometry() -> QRect:
