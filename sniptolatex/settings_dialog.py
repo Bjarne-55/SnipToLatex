@@ -7,7 +7,7 @@ and a prompt editor toolbar with undo/redo/restore/delete actions.
 
 from typing import Optional
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QTextOption
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -307,7 +307,10 @@ class SettingsDialog(QDialog):
         self.txt_prompt = QPlainTextEdit(prompt_card)
         self.txt_prompt.setPlaceholderText("Edit the prompt sent to the model...")
         self.txt_prompt.setTabChangesFocus(False)
-        self.txt_prompt.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        # Wrap lines to avoid horizontal scrolling
+        self.txt_prompt.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self.txt_prompt.setWordWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        self.txt_prompt.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.txt_prompt.setUndoRedoEnabled(True)
         # Keep icon buttons in sync with undo/redo availability and cursor/tooltips
         self.txt_prompt.undoAvailable.connect(self._update_undo_state)
