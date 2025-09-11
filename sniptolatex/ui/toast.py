@@ -11,7 +11,7 @@ This widget is self-contained and can be triggered from anywhere.
 
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize, QPointF, QRectF
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize, QPointF, QRectF, pyqtProperty
 from PyQt6.QtGui import QColor, QPainter, QPen, QPainterPath, QGuiApplication
 from PyQt6.QtWidgets import (
     QWidget,
@@ -88,38 +88,76 @@ class _Spinner(QWidget):
 
 
 class _CheckIcon(QWidget):
-    """Animated-style check icon painted from a path.
-
-    For simplicity we draw the full check without stroke animation to match
-    the template look and color.
-    """
+    """Check icon with stroke-draw animation."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setFixedSize(CHECK_SIZE)
         self._color = QColor(0x4A, 0xDE, 0x80)  # #4ade80
+        self._progress = 0.0  # 0..1 controls how much of the path is drawn
+        self._anim = QPropertyAnimation(self, b"animProgress", self)
+        self._anim.setDuration(250)
+        self._anim.setStartValue(0.0)
+        self._anim.setEndValue(1.0)
+
+    # Expose animatable property via Qt property so QPropertyAnimation can drive it
+    def getAnimProgress(self) -> float:  # noqa: N802
+        return self._progress
+
+    def setAnimProgress(self, v: float) -> None:  # noqa: N802
+        self._progress = max(0.0, min(1.0, float(v)))
+        self.update()
+    # Name must match QPropertyAnimation target property
+    animProgress = pyqtProperty(float, fget=getAnimProgress, fset=setAnimProgress)
+
+    def start(self) -> None:
+        self._anim.stop()
+        self._anim.start()
+
+    def _points(self, w: int, h: int) -> tuple[QPointF, QPointF, QPointF]:
+        s = float(min(w, h))
+        def pt(x: float, y: float) -> QPointF:
+            return QPointF(x * s, y * s)
+        p0 = pt(0.30, 0.55)
+        p1 = pt(0.48, 0.72)
+        p2 = pt(0.82, 0.35)
+        return p0, p1, p2
 
     def paintEvent(self, _) -> None:  # type: ignore[override]
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         w, h = self.width(), self.height()
-        # Build a path similar to the template's 24x24 check
-        path = QPainterPath()
-        # Coordinates normalized to box size
-        s = min(w, h)
-        def pt(x: float, y: float) -> QPointF:
-            return QPointF(x * s, y * s)
+        p0, p1, p2 = self._points(w, h)
 
-        path.moveTo(pt(0.30, 0.55))
-        path.lineTo(pt(0.48, 0.72))
-        path.lineTo(pt(0.82, 0.35))
+        # Compute segment lengths
+        def dist(a: QPointF, b: QPointF) -> float:
+            dx, dy = (a.x() - b.x()), (a.y() - b.y())
+            return (dx*dx + dy*dy) ** 0.5
+
+        L1 = dist(p0, p1)
+        L2 = dist(p1, p2)
+        total = L1 + L2 if (L1 + L2) > 0 else 1.0
+        tlen = max(0.0001, float(self._progress) * total)
+
+        # Build partial path
+        partial = QPainterPath(p0)
+        if tlen <= L1:
+            k = tlen / L1 if L1 > 0 else 0.0
+            end = QPointF(p0.x() + (p1.x() - p0.x()) * k, p0.y() + (p1.y() - p0.y()) * k)
+            partial.lineTo(end)
+        else:
+            partial.lineTo(p1)
+            rem = min(L2, tlen - L1)
+            k = (rem / L2) if L2 > 0 else 1.0
+            end = QPointF(p1.x() + (p2.x() - p1.x()) * k, p1.y() + (p2.y() - p1.y()) * k)
+            partial.lineTo(end)
 
         pen = QPen(self._color)
         pen.setWidthF(2.5)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         p.setPen(pen)
-        p.drawPath(path)
+        p.drawPath(partial)
 
 
 class Toast(QWidget):
@@ -280,6 +318,7 @@ class Toast(QWidget):
         """
         self._spinner.hide()
         self._check.show()
+        self._check.start()
         self._title.setText("Success")
         self._desc.setText("Reponse copied to clipboard")
         # Add a subtle green glow around the card
