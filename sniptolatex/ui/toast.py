@@ -12,10 +12,8 @@ description text. Two visual states are supported:
 The widget is self-contained and can be triggered from anywhere in the app.
 """
 
-# (no file assets needed; icons are painted in code)
-
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize, QPointF, QRectF, pyqtProperty
-from PyQt6.QtGui import QColor, QPainter, QPen, QPainterPath, QGuiApplication, QRegion
+from PyQt6.QtGui import QColor, QPainter, QPen, QPainterPath, QGuiApplication, QRegion, QPixmap
 from PyQt6.QtWidgets import (
     QWidget,
     QLabel,
@@ -28,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .theme import load_stylesheet, get_QColor
+from .icons import load_pixmap
 
 # --------------------------------------------------------------------------------------
 # Constants (design tokens and timing)
@@ -240,31 +239,7 @@ class _CheckIcon(QWidget):
         p.drawPath(partial)
 
 
-class _ErrorIcon(QWidget):
-    """Simple error icon (circle with exclamation)."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setFixedSize(CHECK_SIZE)
-
-    def paintEvent(self, _) -> None:  # type: ignore[override]
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        w, h = self.width(), self.height()
-        r = min(w, h)
-        cx, cy = w / 2.0, h / 2.0
-
-        penCircle = QPen(COLOR_ERROR)
-        penCircle.setWidthF(2.0)
-        p.setPen(penCircle)
-        p.drawEllipse(QRectF(1.5, 1.5, r - 3.0, r - 3.0))
-
-        penMark = QPen(COLOR_ERROR)
-        penMark.setWidthF(2.2)
-        penMark.setCapStyle(Qt.PenCapStyle.RoundCap)
-        p.setPen(penMark)
-        p.drawLine(QPointF(cx, cy - r * 0.25), QPointF(cx, cy + r * 0.10))
-        p.drawPoint(QPointF(cx, cy + r * 0.28))
+# Icon helpers are provided by ui/icons.py
 
 
 class Toast(QWidget):
@@ -342,7 +317,10 @@ class Toast(QWidget):
 
         self._spinner = _Spinner(self._icon_wrap)
         self._check = _CheckIcon(self._icon_wrap)
-        self._error = _ErrorIcon(self._icon_wrap)
+        self._error = QLabel(self._icon_wrap)
+        self._error.setFixedSize(CHECK_SIZE)
+        self._error.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._error.setPixmap(load_pixmap("error.svg", CHECK_SIZE))
         self._check.hide()
         self._error.hide()
         icon_layout.addWidget(self._spinner)
