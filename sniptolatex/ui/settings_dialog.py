@@ -7,7 +7,7 @@ the design in ``DesignTemplates/SettingsMenu`` and use an external QSS theme.
 
 from typing import Optional
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QIcon, QTextOption
+from PyQt6.QtGui import QIcon, QTextOption, QTextCursor
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
@@ -435,9 +435,12 @@ class SettingsDialog(QDialog):
         self.txt_prompt.setPlainText(raw)
 
     def _reset_prompt_to_default(self) -> None:
-        """Replace the editor content with the shipped default prompt."""
+        """Replace the editor content with the shipped default prompt.
+
+        Use an undoable edit so the user can undo this action.
+        """
         model = self.current_model()
-        self.txt_prompt.setPlainText(self._default_prompt_for(model))
+        self._set_prompt_text_undoable(self._default_prompt_for(model))
 
     def _restore_last_saved(self) -> None:
         """Restore the last saved prompt for the selected model.
@@ -449,7 +452,25 @@ class SettingsDialog(QDialog):
         stored = cfg.get("prompt")
         if stored is None or len(stored) == 0:
             stored = self._default_prompt_for(model)
-        self.txt_prompt.setPlainText(stored)
+        # Perform as an undoable replace so user can undo Restore.
+        self._set_prompt_text_undoable(stored)
+
+    def _set_prompt_text_undoable(self, text: str) -> None:
+        """Set prompt editor contents as a single undoable operation.
+
+        Programmatic setPlainText clears the undo stack. To allow users to
+        undo actions like Restore/Delete, we replace the entire document
+        using a QTextCursor edit block which becomes one undo step.
+        """
+        try:
+            cursor = self.txt_prompt.textCursor()
+            cursor.beginEditBlock()
+            cursor.select(QTextCursor.SelectionType.Document)
+            cursor.insertText(text)
+            cursor.endEditBlock()
+        except Exception:
+            # Fallback if anything goes wrong
+            self.txt_prompt.setPlainText(text)
 
     def _on_segmented_changed(self) -> None:
         """Update context labels and reload values when the model changes."""

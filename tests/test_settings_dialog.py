@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -92,4 +93,66 @@ def test_settings_loads_values_per_model_and_switches(qapp, isolated_config_dir)
     g2 = read_model_settings("gemini")
     assert g2["api_key"] == "G-KEY-2"
     assert g2["prompt"] == "G-PROMPT-2"
+
+def test_settings_prompt_buttons(qapp, isolated_config_dir):
+    from sniptolatex.config import (
+        write_model_settings,
+        set_selected_model,
+        read_model_settings,
+        get_selected_model,
+    )
+    write_model_settings("gemini", api_key="G-KEY", prompt="G-PROMPT")
+    set_selected_model("gemini")
+
+    from sniptolatex.ui.settings_dialog import SettingsDialog
+
+    dlg = SettingsDialog()
+
+    # Dialog should initialize to selected model and load its values
+    assert dlg.current_model() == "gemini"
+    assert dlg.txt_key.text() == "G-KEY"
+    assert dlg.txt_prompt.toPlainText() == "G-PROMPT"
+    
+    path_default_prompt = Path(__file__).resolve().parent.parent / "sniptolatex" / \
+        "ai" / "prompts" / "gemini_image_to_latex.txt"
+    default_prompt = path_default_prompt.read_text(encoding="utf-8")
+
+    # Clicking delete resets to the shipped default
+    dlg.btn_delete.click()
+    assert dlg.txt_prompt.toPlainText() == default_prompt
+
+    # Simulate user edit so it becomes undoable
+    from PyQt6.QtTest import QTest
+    dlg.txt_prompt.selectAll()
+    QTest.keyClicks(dlg.txt_prompt, "G-PROMPT-2")
+    qapp.processEvents()
+
+    # undo: default, G-PROMPT
+    dlg.btn_undo.click()
+    qapp.processEvents()
+    assert dlg.txt_prompt.toPlainText() == default_prompt
+    dlg.btn_undo.click()
+    qapp.processEvents()
+    assert dlg.txt_prompt.toPlainText() == "G-PROMPT"
+
+    # Redo: default, then typed text
+    dlg.btn_redo.click()
+    qapp.processEvents()
+    assert dlg.txt_prompt.toPlainText() == default_prompt
+    dlg.btn_redo.click()
+    qapp.processEvents()
+    assert dlg.txt_prompt.toPlainText() == "G-PROMPT-2"
+
+    # Restore button reloads last saved prompt from config
+    dlg.btn_restore.click()
+    qapp.processEvents()
+    assert dlg.txt_prompt.toPlainText() == "G-PROMPT"
+
+    # check undoable
+    dlg.btn_undo.click()
+    qapp.processEvents()
+    assert dlg.txt_prompt.toPlainText() == "G-PROMPT-2"
+    dlg.btn_redo.click()
+    qapp.processEvents()
+    assert dlg.txt_prompt.toPlainText() == "G-PROMPT"
 
