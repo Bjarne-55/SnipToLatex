@@ -54,7 +54,17 @@ class SettingsDialog(QDialog):
         # Modern, clean stylesheet
         self.setStyleSheet(
             """
-            QDialog { background: #0b0f12; color: #e6edf3; }
+            /* Subtle dialog background using a gradient (no custom painting) */
+            QDialog {
+                background: qradialgradient(
+                    cx: 0.12, cy: -0.10, fx: 0.12, fy: -0.10, radius: 1.15,
+                    stop: 0 rgba(90, 61, 255, 0.12),  /* softer purple glow */
+                    stop: 0.45 rgba(90, 61, 255, 0.03),
+                    stop: 0.70 rgba(0, 0, 0, 0.00),   /* fade out */
+                    stop: 1 #0b0f12                    /* base background */
+                );
+                color: #e6edf3;
+            }
             QLabel { color: #e6edf3; font-size: 14px; }
 
             /* Cards */
@@ -97,7 +107,7 @@ class SettingsDialog(QDialog):
             }
 
             /* Footer + Buttons */
-            QFrame#footer { border-top: 1px solid #223142; padding-top: 12px; margin-top: 4px; }
+            QFrame#footer { padding-top: 12px; margin-top: 4px; }
             QDialogButtonBox QPushButton {
                 min-height: 36px; min-width: 96px;
                 padding: 10px 16px; border-radius: 12px; font-weight: 600;
