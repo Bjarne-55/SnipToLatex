@@ -5,6 +5,7 @@ and customizing its prompt. Actual API calls are not implemented.
 """
 
 from .request import Request
+import time
 
 
 class ChatGPTRequest(Request):
@@ -20,5 +21,6 @@ class ChatGPTRequest(Request):
     def send_image(self, image: bytes) -> str:
         # In a future implementation, this would call the OpenAI API.
         # For now, we just return a placeholder message so the flow continues.
+        time.sleep(1)
         return "[ChatGPT placeholder: not implemented]"
 
