@@ -31,6 +31,7 @@ from ..config import (
     write_model_settings,
 )
 from .theme import load_stylesheet
+from .icons import load_icon
 
 
 class SettingsDialog(QDialog):
@@ -208,8 +209,8 @@ class SettingsDialog(QDialog):
         self._btn_toggle_key = QPushButton("", card_key)
         self._btn_toggle_key.setObjectName("iconButton")
         self._btn_toggle_key.setToolTip("Show/Hide API key")
-        self._eye_icon = self._load_icon("eye.svg")
-        self._eye_off_icon = self._load_icon("eye-off.svg")
+        self._eye_icon = load_icon("eye.svg")
+        self._eye_off_icon = load_icon("eye-off.svg")
         if not self._eye_icon.isNull():
             self._btn_toggle_key.setIcon(self._eye_icon)
         self._btn_toggle_key.clicked.connect(self._toggle_key_visibility)
@@ -350,7 +351,7 @@ class SettingsDialog(QDialog):
         btn = QPushButton("", parent)
         btn.setObjectName("iconButton")
         btn.setToolTip(tooltip)
-        icon = self._load_icon(icon_name)
+        icon = load_icon(icon_name)
         if not icon.isNull():
             btn.setIcon(icon)
         btn.clicked.connect(on_click)
@@ -363,32 +364,6 @@ class SettingsDialog(QDialog):
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
             except Exception:
                 pass
-
-    def _icon_path(self, name: str) -> Path:
-        """Build absolute path to an icon asset.
-
-        Args:
-            name: Icon file name (e.g., ``"eye.svg"``).
-
-        Returns:
-            Path: Resolved path to the icon.
-        """
-        return Path(__file__).parent / "assets" / "icons" / name
-
-    def _load_icon(self, name: str) -> QIcon:
-        """Safely load an icon.
-
-        Args:
-            name: Icon file name.
-
-        Returns:
-            QIcon: The loaded icon or an empty icon if loading fails.
-        """
-        try:
-            path = self._icon_path(name)
-            return QIcon(str(path))
-        except Exception:
-            return QIcon()
 
     def _default_prompt_for(self, model: str) -> str:
         """Get the shipped default prompt text for a model.

@@ -1,0 +1,24 @@
+/* Toast stylesheet — visually aligned with Settings styles */
+
+/* Root toast card */
+QFrame#toastCard {
+    /* Solid card background (no transparency) */
+    background-color: @input-bg;
+    border: 1px solid @border;
+    border-radius: 14px;
+    margin: 8px;
+}
+
+/* Success border highlight */
+QFrame#toastCard[state="success"] {
+    border: 1px solid @ok-45;
+}
+
+QFrame#toastCard[state="error"] {
+    border: 1px solid @error-45;
+}
+
+/* Title + description
+   Use point units so text scales with OS DPI. ~14px -> ~11pt, 12px -> 9pt. */
+QLabel#toastTitle { color: @fg-text; font-size: 11pt; font-weight: 500; }
+QLabel#toastDesc  { color: @muted-text; font-size: 9pt; }
