@@ -2,17 +2,20 @@ from __future__ import annotations
 
 """Toast/notification widget (PyQt6).
 
-Matches the design template in DesignTemplates/Toast:
- - Bottom-centered card with icon + title + description
- - Two states: loading (spinner) and success (check + green glow)
+This implementation mirrors the web design in ``DesignTemplates/Toast``.
+It shows a bottom-centered card with an icon, a title, and a short
+description text. Two visual states are supported:
 
-This widget is self-contained and can be triggered from anywhere.
+- Loading: animated spinner and waiting copy
+- Success: animated checkmark stroke and subtle green glow
+
+The widget is self-contained and can be triggered from anywhere in the app.
 """
 
-from pathlib import Path
+# (no file assets needed; icons are painted in code)
 
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize, QPointF, QRectF, pyqtProperty
-from PyQt6.QtGui import QColor, QPainter, QPen, QPainterPath, QGuiApplication
+from PyQt6.QtGui import QColor, QPainter, QPen, QPainterPath, QGuiApplication, QRegion
 from PyQt6.QtWidgets import (
     QWidget,
     QLabel,
@@ -26,16 +29,85 @@ from PyQt6.QtWidgets import (
 
 from .theme import load_stylesheet
 
+# --------------------------------------------------------------------------------------
+# Constants (design tokens and timing)
+# --------------------------------------------------------------------------------------
+
 # Icon container size and inner icon sizes (template: 24px box, spinner ~18px)
 ICON_BOX = QSize(24, 24)
 SPINNER_SIZE = QSize(18, 18)
 CHECK_SIZE = QSize(20, 20)
 
+# Spinner motion/appearance
+SPINNER_TICK_MS = 16  # ~60 FPS
+SPINNER_DEG_PER_TICK = 6
+SPINNER_THICKNESS = 3.0
+SPINNER_GAP_DEG = 60.0
+
+# Layout
+RADIUS_PX = 14
+BOTTOM_MARGIN_PX = 24
+SIDE_PADDING_PX = 12
+
+# Timing
+FADE_OUT_MS = 180
+AUTO_DISMISS_MS = 1500
+
+# Colors (keep centralized for easy theme changes)
+COLOR_ACCENT_CYAN = QColor(109, 214, 255)    # @accent-cyan
+COLOR_ACCENT_VIOLET = QColor(164, 139, 255)  # @accent-violet
+COLOR_SUCCESS = QColor(74, 222, 128)         # #4ade80
+SUCCESS_GLOW_ALPHA = 0.45
+SUCCESS_GLOW_BLUR = 8
+
+
+def color_with_alpha(color: QColor, alpha: float) -> QColor:
+    """Return a copy of ``color`` with the given ``alpha`` multiplier.
+
+    Args:
+        color: Base color.
+        alpha: Alpha fraction in the range [0, 1].
+
+    Returns:
+        QColor: A new color instance with the requested alpha applied.
+    """
+    c = QColor(color)
+    c.setAlpha(int(max(0.0, min(1.0, alpha)) * 255))
+    return c
+
+
+class _Card(QFrame):
+    """Rounded card ensuring effects (e.g., glow) respect rounded corners.
+
+    The widget applies a rounded mask on resize so that QGraphicsEffects
+    render with the same radius as the visual card.
+    """
+
+    def __init__(self, parent: QWidget | None = None, radius: int = RADIUS_PX) -> None:
+        super().__init__(parent)
+        self._radius = radius
+        # Enable styled backgrounds so QSS background is painted
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._apply_mask()
+
+    def _apply_mask(self) -> None:
+        r = self.rect()
+        if r.isNull():
+            return
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(r), float(self._radius), float(self._radius))
+        region = QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(region)
+
 
 class _Spinner(QWidget):
-    """Accent gradient ring spinner sized to SPINNER_SIZE.
+    """Accent gradient ring spinner.
 
-    Draws a 300° arc with a gradient and rotates it using a timer.
+    A thin ring covering ~300° with a subtle two-tone accent. The start angle
+    advances on a timer to create motion.
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -45,19 +117,19 @@ class _Spinner(QWidget):
         self._angle = 0
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
-        self._timer.start(16)  # ~60fps
+        self._timer.start(SPINNER_TICK_MS)
 
         # Colors aligned with theme accents
-        self._c1 = QColor(0x6D, 0xD6, 0xFF)  # @accent-cyan
-        self._c2 = QColor(0xA4, 0x8B, 0xFF)  # @accent-violet
+        self._c1 = COLOR_ACCENT_CYAN
+        self._c2 = COLOR_ACCENT_VIOLET
 
     def _tick(self) -> None:
-        self._angle = (self._angle + 6) % 360  # rotate ~360deg/sec
+        self._angle = (self._angle + SPINNER_DEG_PER_TICK) % 360
         self.update()
 
     def paintEvent(self, _) -> None:  # type: ignore[override]
-        thickness = 3.0
-        gap_deg = 60.0  # gap for spinner arc
+        thickness = SPINNER_THICKNESS
+        gap_deg = SPINNER_GAP_DEG
         start_deg = self._angle * 16
         span_deg = int((360.0 - gap_deg) * 16)
 
@@ -88,12 +160,16 @@ class _Spinner(QWidget):
 
 
 class _CheckIcon(QWidget):
-    """Check icon with stroke-draw animation."""
+    """Check icon with stroke-draw animation.
+
+    The check is composed of two straight segments. The animated progress maps
+    linearly to the cumulative path length, producing a smooth reveal.
+    """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setFixedSize(CHECK_SIZE)
-        self._color = QColor(0x4A, 0xDE, 0x80)  # #4ade80
+        self._color = COLOR_SUCCESS
         self._progress = 0.0  # 0..1 controls how much of the path is drawn
         self._anim = QPropertyAnimation(self, b"animProgress", self)
         self._anim.setDuration(250)
@@ -164,25 +240,26 @@ class Toast(QWidget):
     """Frameless floating toast widget.
 
     The toast displays a compact card containing an icon (spinner or checkmark)
-    and a single line of text. It shows above all windows and auto-dismisses
-    after a short delay in the success state.
+    and a two-line text. It stays above all windows and auto-dismisses briefly
+    after switching to the success state.
 
     Attributes:
-        _card: The inner card widget that holds the content and visual style.
-        _icon_wrap: Container for icon sizing/alignment.
+        _card: Inner card that hosts the content and visual style.
+        _icon_wrap: Container for icon alignment and sizing.
         _spinner: Loading spinner widget.
-        _check: Success checkmark widget.
+        _check: Checkmark widget.
         _title: Title label.
         _desc: Description label.
-        _close_timer: Timer used to schedule the auto-dismiss.
-        _fade_anim: Opacity animation used for fade-out.
+        _close_timer: Timer for auto-dismiss in success state.
+        _fade_anim: Opacity animation for fade out.
+        _success_glow: Optional success glow effect for the card.
     """
 
-    def __init__(self, parent: QWidget = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize the toast widget.
 
         Args:
-            parent: Optional parent widget used for window ownership only.
+            parent: Optional parent widget for window ownership.
         """
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
@@ -197,13 +274,13 @@ class Toast(QWidget):
             pass
 
     def _configure_window(self) -> None:
-        """Configure window flags and attributes for a frameless, floating UI."""
+        """Configure window flags and translucent background for a floating UI."""
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setWindowFlag(Qt.WindowType.NoDropShadowWindowHint, True)
 
     def _build_ui(self) -> None:
         """Create the card and its internal content layout (icon + text)."""
-        self._card = QFrame(self)
+        self._card = _Card(self)
         self._card.setObjectName("toastCard")
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -214,7 +291,7 @@ class Toast(QWidget):
         """Build the icon and text row within the card.
 
         Args:
-            parent: The card widget that will host the content.
+            parent: The card widget that hosts the content.
         """
         content_layout = QVBoxLayout(parent)
         content_layout.setContentsMargins(14, 12, 14, 12)
@@ -267,30 +344,30 @@ class Toast(QWidget):
 
         self.setWindowOpacity(1.0)
         self._fade_anim = QPropertyAnimation(self, b"windowOpacity", self)
-        self._fade_anim.setDuration(180)
+        self._fade_anim.setDuration(FADE_OUT_MS)
         self._success_glow = None  # type: QGraphicsDropShadowEffect | None
 
     def _place_bottom_center(self) -> None:
         """Place the toast near the bottom-center of the primary screen.
 
-        The widget is horizontally centered with a small horizontal padding to
-        avoid screen edges, and vertically positioned slightly above the bottom.
+        Horizontally centers the toast and positions it slightly above the
+        bottom edge with some side padding to avoid screen edges.
         """
         screen = QGuiApplication.primaryScreen()
         geo = screen.availableGeometry()
         self.adjustSize()
         x = geo.center().x() - self.width() // 2
-        y = geo.bottom() - self.height() - 24  # near bottom with margin
+        y = geo.bottom() - self.height() - BOTTOM_MARGIN_PX
         # Keep within screen bounds with small side padding
-        left_bound = geo.left() + 12
-        right_bound = geo.right() - self.width() - 12
+        left_bound = geo.left() + SIDE_PADDING_PX
+        right_bound = geo.right() - self.width() - SIDE_PADDING_PX
         self.move(max(left_bound, min(x, right_bound)), max(geo.top() + 12, y))
 
     def show_loading(self) -> None:
-        """Show a loading state with an indeterminate spinner.
+        """Show the loading state with an indeterminate spinner.
 
-        The toast is displayed immediately and remains visible until another
-        state is shown (e.g., ``show_success``) or the application hides it.
+        The toast remains visible until another state is shown or it is
+        programmatically hidden.
         """
         # Spinner visible, check hidden
         self._spinner.show()
@@ -311,22 +388,22 @@ class Toast(QWidget):
         self._place_bottom_center()
 
     def show_success(self) -> None:
-        """Show a success state and auto-dismiss after a short delay.
+        """Show the success state and auto-dismiss after a short delay.
 
-        The spinner is replaced with a checkmark icon and the text is updated.
-        The toast remains visible briefly and then fades out automatically.
+        Replaces the spinner with an animated checkmark, updates the text, and
+        applies a subtle green glow to the card. The toast then fades out.
         """
         self._spinner.hide()
         self._check.show()
         self._check.start()
         self._title.setText("Success")
-        self._desc.setText("Reponse copied to clipboard")
+        self._desc.setText("Response copied to clipboard")
         # Add a subtle green glow around the card
         glow = QGraphicsDropShadowEffect(self)
-        glow.setBlurRadius(8)
+        glow.setBlurRadius(SUCCESS_GLOW_BLUR)
         glow.setXOffset(0)
         glow.setYOffset(0)
-        glow.setColor(QColor(74, 222, 128, int(0.45 * 255)))
+        glow.setColor(color_with_alpha(COLOR_SUCCESS, SUCCESS_GLOW_ALPHA))
         self._card.setGraphicsEffect(glow)
         self._success_glow = glow
         self._card.setProperty("state", "success")
@@ -337,7 +414,7 @@ class Toast(QWidget):
         self.raise_()
         self._place_bottom_center()
         # animate a quick fade-in for a subtle success feel
-        self._close_timer.start(1500)
+        self._close_timer.start(AUTO_DISMISS_MS)
 
 
     def _fade_out_and_hide(self) -> None:
