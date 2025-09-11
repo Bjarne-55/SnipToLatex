@@ -10,7 +10,6 @@ from PyQt6.QtGui import QColor, QGuiApplication, QMouseEvent, QPainter, QPen
 from PyQt6.QtWidgets import QWidget, QPushButton
 
 from ..capture import capture_and_copy, get_virtual_geometry
-from .settings_dialog import SettingsDialog
 
 
 class SelectionOverlay(QWidget):
@@ -24,7 +23,6 @@ class SelectionOverlay(QWidget):
         _virtual_rect (QRect): The virtual desktop rectangle covering all monitors.
         _overlay_color (QColor): Semi-transparent fill color for dimming background.
         _border_pen (QPen): Pen used to draw the selection border.
-        settings_button (QPushButton): Button to open the settings dialog.
     """
     closed = pyqtSignal()
 
@@ -45,32 +43,6 @@ class SelectionOverlay(QWidget):
 
         self._overlay_color = QColor(0, 0, 0, 100)
         self._border_pen = QPen(QColor(0, 153, 255, 220), 2, Qt.PenStyle.SolidLine)
-
-        self.settings_button = QPushButton("⚙", self)
-        self.settings_button.setFixedSize(32, 32)
-        self.settings_button.move(12, 12)
-        self.settings_button.setStyleSheet(
-            "QPushButton{background: #B4141414; color: #FFFFFF; border: 1px solid #78FFFFFF; border-radius: 4px;}"
-            "QPushButton:hover{background: #C8282828;}"
-        )
-        self.settings_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.settings_button.clicked.connect(self._open_settings)
-
-    def _open_settings(self) -> None:
-        """Open the settings dialog."""
-        released = False
-        try:
-            self.releaseKeyboard()
-            released = True
-        except Exception:
-            pass
-        dlg = SettingsDialog(self)
-        dlg.exec()
-        if released:
-            try:
-                self.grabKeyboard()
-            except Exception:
-                pass
 
     def begin(self) -> None:
         """Show the overlay across all monitors and prepare for dragging."""
@@ -108,9 +80,6 @@ class SelectionOverlay(QWidget):
             return
         if event.button() == Qt.MouseButton.LeftButton:
             # Use Qt6 QPointF-based positions
-            if self.settings_button.geometry().contains(event.position().toPoint()):
-                self.settings_button.click()
-                return
             self._dragging = True
             self._start = event.globalPosition().toPoint()
             self._end = self._start
