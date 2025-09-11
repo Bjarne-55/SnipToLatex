@@ -13,6 +13,7 @@ from sniptolatex.hotkeys import (
     start_hotkey_listener as app_start_hotkey_listener,
 )
 from sniptolatex.ui.settings_dialog import SettingsDialog
+from sniptolatex.ui.icons import load_icon
 
 def main() -> int:
     app = QApplication(sys.argv)
@@ -36,10 +37,8 @@ def main() -> int:
     # Add a tray icon so the app can run headless without a console window
     if QSystemTrayIcon.isSystemTrayAvailable():
         tray = QSystemTrayIcon()
-        # Minimal in-memory icon so the tray actually shows up on Windows
-        pix = QPixmap(16, 16)
-        pix.fill(QColor(0, 153, 255))
-        tray.setIcon(QIcon(pix))
+        app_icon = load_icon("app.svg")
+        tray.setIcon(app_icon)
         # Simple context menu with Settings and Quit
         menu = QMenu()
         settings_action = QAction("Settings", menu)

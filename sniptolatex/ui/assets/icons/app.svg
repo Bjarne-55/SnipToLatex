@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <rect x="0" y="0" width="24" height="24" fill="#ffffff" rx="4" ry="4"/>
+  <!-- Selection crop corners -->
+  <path d="M3 7V3h4M17 3h4v4M3 17v4h4M21 17v4h-4" stroke="#0ea5e9" stroke-width="2"/>
+  <!-- Pi symbol to hint LaTeX/math -->
+  <path d="M6 9h12M8 9v8M16 9v8" stroke="#000000" stroke-width="2" stroke-linecap="round"/>
+</svg>
