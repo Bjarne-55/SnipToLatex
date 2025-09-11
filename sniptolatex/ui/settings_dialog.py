@@ -119,7 +119,7 @@ class SettingsDialog(QDialog):
         header_l.setContentsMargins(12, 10, 12, 10)
         header_l.setSpacing(12)
 
-        logo = QLabel("∑", header)
+        logo = QLabel("⚙", header)
         logo.setObjectName("logo")
         logo.setFixedSize(36, 36)
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
