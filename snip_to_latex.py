@@ -43,9 +43,24 @@ def main() -> int:
         # Simple context menu with Settings and Quit
         menu = QMenu()
         settings_action = QAction("Settings", menu)
+        # Ensure only one settings dialog at a time
+        settings_dlg = None
         def open_settings():
+            nonlocal settings_dlg
+            if settings_dlg is not None and settings_dlg.isVisible():
+                try:
+                    settings_dlg.show()
+                    settings_dlg.raise_()
+                    settings_dlg.activateWindow()
+                except Exception:
+                    pass
+                return
             dlg = SettingsDialog()
-            dlg.exec()
+            settings_dlg = dlg
+            try:
+                dlg.exec()
+            finally:
+                settings_dlg = None
         settings_action.triggered.connect(open_settings)
         menu.addAction(settings_action)
 
