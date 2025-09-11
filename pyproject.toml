@@ -32,7 +32,6 @@ sniptolatex = [
   "ai/prompts/*.txt",
   "ui/styles/*.qss",
   "ui/assets/icons/*.svg",
-  "ui/assets/media/*",
 ]
 
 [tool.setuptools.data-files]
