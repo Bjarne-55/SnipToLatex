@@ -39,10 +39,14 @@ def _styles_dir() -> Path:
 
 
 def load_stylesheet(name: str, colors: Mapping[str, str] | None = None) -> str:
-    """Load a QSS stylesheet by name from sniptolatex/styles and resolve tokens.
+    """Load a QSS stylesheet by name from ui/styles and resolve tokens.
 
-    - name: filename without extension (e.g., "settings_dialog").
-    - colors: optional mapping overriding DEFAULT_COLORS.
+    Args:
+        name: Filename without extension (e.g., "settings_dialog").
+        colors: Optional mapping overriding DEFAULT_COLORS.
+
+    Returns:
+        str: Resolved QSS stylesheet content.
     """
     path = _styles_dir() / f"{name}.qss"
     raw = path.read_text(encoding="utf-8")
@@ -53,7 +57,7 @@ def resolve_qss(qss: str, colors: Mapping[str, str] | None = None) -> str:
     palette = dict(DEFAULT_COLORS)
     if colors:
         palette.update(colors)
-    # Replace each token. Order doesn't matter as tokens are distinct.
     for token, value in palette.items():
         qss = qss.replace(token, value)
     return qss
+

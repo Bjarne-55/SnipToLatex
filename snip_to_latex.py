@@ -12,7 +12,7 @@ from sniptolatex.hotkeys import (
     HotkeyBridge as AppHotkeyBridge,
     start_hotkey_listener as app_start_hotkey_listener,
 )
-from sniptolatex.settings_dialog import SettingsDialog
+from sniptolatex.ui.settings_dialog import SettingsDialog
 
 def main() -> int:
     app = QApplication(sys.argv)

@@ -181,10 +181,13 @@ class Toast(QWidget):
         Returns:
             QMovie: The spinner animation sized to ``ICON_SIZE``.
         """
-        resource_path = Path(__file__).parent / "resources" / "Rolling@1x-3.3s-200px-200px.gif"
-        movie = QMovie(str(resource_path))
-        movie.setScaledSize(ICON_SIZE)
-        return movie
+        candidate = Path(__file__).parent / "assets" / "media" / "Rolling@1x-3.3s-200px-200px.gif"
+        mv = QMovie(str(candidate)) if candidate.exists() else QMovie()
+        if getattr(mv, "isValid", None) and mv.isValid():
+            mv.setScaledSize(ICON_SIZE)
+            return mv
+        # As a last resort, return an empty movie to avoid crashes
+        return QMovie()
 
     def _load_check_icon(self) -> QPixmap:
         """Load and scale the success check icon.
@@ -192,7 +195,7 @@ class Toast(QWidget):
         Returns:
             QPixmap: The success icon pixmap scaled to ``ICON_SIZE``.
         """
-        resource_path = Path(__file__).parent / "resources" / "check.svg"
+        resource_path = Path(__file__).parent / "assets" / "icons" / "check.svg"
         pixmap = QPixmap(str(resource_path)).scaled(
             ICON_SIZE,
             Qt.AspectRatioMode.KeepAspectRatio,

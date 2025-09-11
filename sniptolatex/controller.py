@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import QObject
 
-from .overlay import SelectionOverlay
+from .ui.overlay import SelectionOverlay
 
 
 class Controller(QObject):
@@ -26,4 +26,3 @@ class Controller(QObject):
             None.
         """
         self.overlay.begin()
-

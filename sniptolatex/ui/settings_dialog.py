@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import QButtonGroup
 from pathlib import Path
 
-from .config import (
+from ..config import (
     get_selected_model,
     set_selected_model,
     read_model_settings,
@@ -400,7 +400,8 @@ class SettingsDialog(QDialog):
             str: Prompt contents; empty string if unavailable.
         """
         name = "chatgpt_image_to_latex.txt" if model == "chatgpt" else "gemini_image_to_latex.txt"
-        path = Path(__file__).parent / "ai" / "prompts" / name
+        # ui/ -> go up to package root to reach ai/prompts
+        path = Path(__file__).resolve().parent.parent / "ai" / "prompts" / name
         try:
             return path.read_text(encoding="utf-8")
         except Exception:

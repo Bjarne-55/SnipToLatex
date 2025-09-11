@@ -28,9 +28,13 @@ py-modules = ["snip_to_latex"]
 include = ["sniptolatex*"]
 
 [tool.setuptools.package-data]
-sniptolatex = ["ai/prompts/*.txt"]
+sniptolatex = [
+  "ai/prompts/*.txt",
+  "ui/styles/*.qss",
+  "ui/assets/icons/*.svg",
+  "ui/assets/media/*",
+]
 
 [tool.setuptools.data-files]
 # Ensure a default config directory is created in wheels (empty file will be created at runtime anyway)
 # Not strictly necessary, but keeps packaging explicit.
-

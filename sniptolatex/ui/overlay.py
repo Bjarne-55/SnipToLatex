@@ -9,7 +9,7 @@ from PyQt6.QtCore import QPoint, QRect, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QGuiApplication, QMouseEvent, QPainter, QPen
 from PyQt6.QtWidgets import QWidget, QPushButton
 
-from .capture import capture_and_copy, get_virtual_geometry
+from ..capture import capture_and_copy, get_virtual_geometry
 from .settings_dialog import SettingsDialog
 
 
@@ -50,8 +50,8 @@ class SelectionOverlay(QWidget):
         self.settings_button.setFixedSize(32, 32)
         self.settings_button.move(12, 12)
         self.settings_button.setStyleSheet(
-            "QPushButton{background: rgba(20,20,20,180); color: white; border: 1px solid rgba(255,255,255,120); border-radius: 4px;}"
-            "QPushButton:hover{background: rgba(40,40,40,200);}" 
+            "QPushButton{background: #B4141414; color: #FFFFFF; border: 1px solid #78FFFFFF; border-radius: 4px;}"
+            "QPushButton:hover{background: #C8282828;}"
         )
         self.settings_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.settings_button.clicked.connect(self._open_settings)

@@ -14,7 +14,7 @@ from PyQt6.QtGui import QGuiApplication, QPixmap, QPainter
 
 from .ai import create_request
 from .config import get_selected_model
-from .toast import Toast
+from .ui.toast import Toast
 
 
 class _ClipboardBridge(QObject):
