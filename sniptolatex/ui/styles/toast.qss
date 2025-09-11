@@ -1,0 +1,20 @@
+/* Toast stylesheet — visually aligned with Settings styles */
+
+/* Root toast card */
+QFrame#toastCard {
+    /* Solid card background (no transparency) */
+    background-color: @input-bg;
+    border: 1px solid @border;
+    border-radius: 14px;
+    margin: 8px;
+}
+
+/* Success border highlight */
+QFrame#toastCard[state="success"] {
+    /* rgba(74,222,128,0.45) */
+    border: 1px solid rgba(74, 222, 128, 0.45);
+}
+
+/* Title + description */
+QLabel#toastTitle { color: @fg-text; font-size: 14px; font-weight: 500; }
+QLabel#toastDesc  { color: @muted-text; font-size: 12px; }

@@ -1,20 +1,125 @@
+from __future__ import annotations
+
 """Toast/notification widget (PyQt6).
 
-This module provides a small, frameless toast used to communicate short, transient
-status information near the bottom center of the primary screen. It exposes two
-simple states: a loading spinner and a success checkmark.
+Matches the design template in DesignTemplates/Toast:
+ - Bottom-centered card with icon + title + description
+ - Two states: loading (spinner) and success (check + green glow)
 
-The implementation is intentionally minimal and self-contained so it can be
-reused from anywhere in the application without additional windows.
+This widget is self-contained and can be triggered from anywhere.
 """
 
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize
-from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout, QSpacerItem, QSizePolicy
-from PyQt6.QtGui import QMovie, QPixmap, QGuiApplication
 from pathlib import Path
 
-# Consistent icon size used for spinner and success icon
-ICON_SIZE = QSize(30, 30)
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize, QPointF, QRectF
+from PyQt6.QtGui import QColor, QPainter, QPen, QPainterPath, QGuiApplication
+from PyQt6.QtWidgets import (
+    QWidget,
+    QLabel,
+    QHBoxLayout,
+    QVBoxLayout,
+    QSpacerItem,
+    QSizePolicy,
+    QFrame,
+    QGraphicsDropShadowEffect,
+)
+
+from .theme import load_stylesheet
+
+# Icon container size and inner icon sizes (template: 24px box, spinner ~18px)
+ICON_BOX = QSize(24, 24)
+SPINNER_SIZE = QSize(18, 18)
+CHECK_SIZE = QSize(20, 20)
+
+
+class _Spinner(QWidget):
+    """Accent gradient ring spinner sized to SPINNER_SIZE.
+
+    Draws a 300° arc with a gradient and rotates it using a timer.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(SPINNER_SIZE)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self._angle = 0
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._tick)
+        self._timer.start(16)  # ~60fps
+
+        # Colors aligned with theme accents
+        self._c1 = QColor(0x6D, 0xD6, 0xFF)  # @accent-cyan
+        self._c2 = QColor(0xA4, 0x8B, 0xFF)  # @accent-violet
+
+    def _tick(self) -> None:
+        self._angle = (self._angle + 6) % 360  # rotate ~360deg/sec
+        self.update()
+
+    def paintEvent(self, _) -> None:  # type: ignore[override]
+        thickness = 3.0
+        gap_deg = 60.0  # gap for spinner arc
+        start_deg = self._angle * 16
+        span_deg = int((360.0 - gap_deg) * 16)
+
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        pen = QPen()
+        pen.setWidthF(thickness)
+        # Two-pass draw to emulate an accent gradient
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+
+        rect = QRectF(self.rect()).adjusted(
+            thickness / 2.0,
+            thickness / 2.0,
+            -thickness / 2.0,
+            -thickness / 2.0,
+        )
+
+        # Base arc in accent cyan
+        pen.setColor(self._c1)
+        p.setPen(pen)
+        p.drawArc(rect, start_deg, span_deg)
+
+        # Overlay shorter arc in accent violet to hint gradient
+        pen.setColor(self._c2)
+        p.setPen(pen)
+        p.drawArc(rect, start_deg + int(span_deg * 0.25), int(span_deg * 0.5))
+
+
+class _CheckIcon(QWidget):
+    """Animated-style check icon painted from a path.
+
+    For simplicity we draw the full check without stroke animation to match
+    the template look and color.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(CHECK_SIZE)
+        self._color = QColor(0x4A, 0xDE, 0x80)  # #4ade80
+
+    def paintEvent(self, _) -> None:  # type: ignore[override]
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        w, h = self.width(), self.height()
+        # Build a path similar to the template's 24x24 check
+        path = QPainterPath()
+        # Coordinates normalized to box size
+        s = min(w, h)
+        def pt(x: float, y: float) -> QPointF:
+            return QPointF(x * s, y * s)
+
+        path.moveTo(pt(0.30, 0.55))
+        path.lineTo(pt(0.48, 0.72))
+        path.lineTo(pt(0.82, 0.35))
+
+        pen = QPen(self._color)
+        pen.setWidthF(2.5)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        p.setPen(pen)
+        p.drawPath(path)
 
 
 class Toast(QWidget):
@@ -26,12 +131,13 @@ class Toast(QWidget):
 
     Attributes:
         _card: The inner card widget that holds the content and visual style.
-        _icon: Label used to display the spinner or success icon.
-        _text: Label used to display the message text.
+        _icon_wrap: Container for icon sizing/alignment.
+        _spinner: Loading spinner widget.
+        _check: Success checkmark widget.
+        _title: Title label.
+        _desc: Description label.
         _close_timer: Timer used to schedule the auto-dismiss.
         _fade_anim: Opacity animation used for fade-out.
-        _loading_movie: Spinner animation movie.
-        _check_icon: Pre-scaled success icon pixmap.
     """
 
     def __init__(self, parent: QWidget = None) -> None:
@@ -45,7 +151,12 @@ class Toast(QWidget):
         self._configure_window()
         self._build_ui()
         self._setup_behavior()
-        self._load_assets()
+        # Apply QSS for visual style
+        try:
+            self.setStyleSheet(load_stylesheet("toast"))
+        except Exception:
+            # In case stylesheet can't be loaded, continue with defaults
+            pass
 
     def _configure_window(self) -> None:
         """Configure window flags and attributes for a frameless, floating UI."""
@@ -54,11 +165,8 @@ class Toast(QWidget):
 
     def _build_ui(self) -> None:
         """Create the card and its internal content layout (icon + text)."""
-        self._card = QWidget(self)
+        self._card = QFrame(self)
         self._card.setObjectName("toastCard")
-        self._card.setStyleSheet(
-            "#toastCard{background-color: #FFFFFF; border: 1px solid #ababab; border-radius: 10px;}"
-        )
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.addWidget(self._card)
@@ -71,23 +179,43 @@ class Toast(QWidget):
             parent: The card widget that will host the content.
         """
         content_layout = QVBoxLayout(parent)
-        content_layout.setContentsMargins(0, 12, 0, 12)
+        content_layout.setContentsMargins(14, 12, 14, 12)
         content_layout.setSpacing(8)
 
         row = QHBoxLayout()
-        row.setContentsMargins(16, 0, 16, 0)
-        row.setSpacing(10)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(12)
         row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        self._icon = QLabel(parent)
-        self._icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._icon.setFixedSize(ICON_SIZE)
+        self._icon_wrap = QWidget(parent)
+        self._icon_wrap.setFixedSize(ICON_BOX)
+        icon_layout = QHBoxLayout(self._icon_wrap)
+        icon_layout.setContentsMargins(0, 0, 0, 0)
+        icon_layout.setSpacing(0)
+        icon_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self._text = QLabel(parent)
-        self._text.setStyleSheet("font-family: 'Segoe UI'; color: #000; font-size: 16px; font-weight: 400; background: transparent;")
+        self._spinner = _Spinner(self._icon_wrap)
+        self._check = _CheckIcon(self._icon_wrap)
+        self._check.hide()
+        icon_layout.addWidget(self._spinner)
+        icon_layout.addWidget(self._check)
 
-        row.addWidget(self._icon)
-        row.addWidget(self._text)
+        text_col = QVBoxLayout()
+        text_col.setContentsMargins(0, 0, 0, 0)
+        text_col.setSpacing(4)
+        self._title = QLabel(parent)
+        self._title.setObjectName("toastTitle")
+        self._title.setText("Sending to model…")
+        self._desc = QLabel(parent)
+        self._desc.setObjectName("toastDesc")
+        self._desc.setText("Waiting for a response")
+        self._title.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        self._desc.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        text_col.addWidget(self._title)
+        text_col.addWidget(self._desc)
+
+        row.addWidget(self._icon_wrap)
+        row.addLayout(text_col)
         row.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
 
         content_layout.addLayout(row)
@@ -102,11 +230,7 @@ class Toast(QWidget):
         self.setWindowOpacity(1.0)
         self._fade_anim = QPropertyAnimation(self, b"windowOpacity", self)
         self._fade_anim.setDuration(180)
-
-    def _load_assets(self) -> None:
-        """Load the spinner movie and success icon pixmap."""
-        self._loading_movie = self._load_loading_movie()
-        self._check_icon = self._load_check_icon()
+        self._success_glow = None  # type: QGraphicsDropShadowEffect | None
 
     def _place_bottom_center(self) -> None:
         """Place the toast near the bottom-center of the primary screen.
@@ -130,13 +254,18 @@ class Toast(QWidget):
         The toast is displayed immediately and remains visible until another
         state is shown (e.g., ``show_success``) or the application hides it.
         """
-        # Spinner inside a neutral circle
-        self._icon.setPixmap(QPixmap())
-        self._icon.setMovie(self._loading_movie)
-        self._loading_movie.start()
-        self._icon.setText("")
-        
-        self._text.setText("Sending to model")
+        # Spinner visible, check hidden
+        self._spinner.show()
+        self._check.hide()
+        self._title.setText("Sending to model…")
+        self._desc.setText("Waiting for a response")
+        # Remove success glow and update border state
+        if self._success_glow is not None:
+            self._card.setGraphicsEffect(None)
+            self._success_glow = None
+        self._card.setProperty("state", "loading")
+        self._card.style().unpolish(self._card)
+        self._card.style().polish(self._card)
         self._close_timer.stop()
         self.setWindowOpacity(1.0)
         self.show()
@@ -149,19 +278,28 @@ class Toast(QWidget):
         The spinner is replaced with a checkmark icon and the text is updated.
         The toast remains visible briefly and then fades out automatically.
         """
-        self._loading_movie.stop()
-        self._icon.setMovie(None)
-        self._icon.setText("")
-        self._icon.setPixmap(self._check_icon)
-
-        self._text.setText("Copied to clipboard")
+        self._spinner.hide()
+        self._check.show()
+        self._title.setText("Success")
+        self._desc.setText("Reponse copied to clipboard")
+        # Add a subtle green glow around the card
+        glow = QGraphicsDropShadowEffect(self)
+        glow.setBlurRadius(8)
+        glow.setXOffset(0)
+        glow.setYOffset(0)
+        glow.setColor(QColor(74, 222, 128, int(0.45 * 255)))
+        self._card.setGraphicsEffect(glow)
+        self._success_glow = glow
+        self._card.setProperty("state", "success")
+        self._card.style().unpolish(self._card)
+        self._card.style().polish(self._card)
         self.setWindowOpacity(1.0)
         self.show()
         self.raise_()
         self._place_bottom_center()
         # animate a quick fade-in for a subtle success feel
         self._close_timer.start(1500)
-        
+
 
     def _fade_out_and_hide(self) -> None:
         """Fade the toast out and hide it when the animation finishes."""
@@ -174,31 +312,3 @@ class Toast(QWidget):
             self._fade_anim.finished.disconnect(_on_finished)
         self._fade_anim.finished.connect(_on_finished)
         self._fade_anim.start()
-    
-    def _load_loading_movie(self) -> QMovie:
-        """Create and configure the spinner movie.
-
-        Returns:
-            QMovie: The spinner animation sized to ``ICON_SIZE``.
-        """
-        candidate = Path(__file__).parent / "assets" / "media" / "Rolling@1x-3.3s-200px-200px.gif"
-        mv = QMovie(str(candidate)) if candidate.exists() else QMovie()
-        if getattr(mv, "isValid", None) and mv.isValid():
-            mv.setScaledSize(ICON_SIZE)
-            return mv
-        # As a last resort, return an empty movie to avoid crashes
-        return QMovie()
-
-    def _load_check_icon(self) -> QPixmap:
-        """Load and scale the success check icon.
-
-        Returns:
-            QPixmap: The success icon pixmap scaled to ``ICON_SIZE``.
-        """
-        resource_path = Path(__file__).parent / "assets" / "icons" / "check.svg"
-        pixmap = QPixmap(str(resource_path)).scaled(
-            ICON_SIZE,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            transformMode=Qt.TransformationMode.SmoothTransformation,
-        )
-        return pixmap
