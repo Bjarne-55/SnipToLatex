@@ -107,3 +107,28 @@ QPushButton#iconButton[inactive="true"]:hover {
 #title { font-size: 22px; font-weight: 700; margin: 0; }
 #logo { background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 @accent-cyan, stop:1 @accent-violet); color: white; border-radius: 10px; }
 #promptHeader QLabel { color: @fg-text; }
+
+/* Global modern scrollbars within the Settings dialog */
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 6px;
+    margin: 0px;
+    border-radius: 3px;
+}
+
+QScrollBar::handle:vertical {
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 @white-06, stop:1 @white-04);
+    min-height: 20px;
+    border-radius: 3px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 @accent-cyan, stop:1 @accent-violet);;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+}
