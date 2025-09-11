@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
     QGraphicsDropShadowEffect,
 )
 
-from .theme import load_stylesheet
+from .theme import load_stylesheet, get_QColor
 
 # --------------------------------------------------------------------------------------
 # Constants (design tokens and timing)
@@ -54,9 +54,10 @@ FADE_OUT_MS = 180
 AUTO_DISMISS_MS = 1500
 
 # Colors (keep centralized for easy theme changes)
-COLOR_ACCENT_CYAN = QColor(109, 214, 255)    # @accent-cyan
-COLOR_ACCENT_VIOLET = QColor(164, 139, 255)  # @accent-violet
-COLOR_SUCCESS = QColor(74, 222, 128)         # #4ade80
+COLOR_ACCENT_CYAN = get_QColor('@accent-cyan')
+COLOR_ACCENT_VIOLET = get_QColor('@accent-violet')
+COLOR_SUCCESS = get_QColor('@ok')
+COLOR_SUCCESS_45 = get_QColor('@ok-45')
 SUCCESS_GLOW_ALPHA = 0.45
 SUCCESS_GLOW_BLUR = 8
 
@@ -403,7 +404,8 @@ class Toast(QWidget):
         glow.setBlurRadius(SUCCESS_GLOW_BLUR)
         glow.setXOffset(0)
         glow.setYOffset(0)
-        glow.setColor(color_with_alpha(COLOR_SUCCESS, SUCCESS_GLOW_ALPHA))
+        # Prefer theme token with alpha if available
+        glow.setColor(COLOR_SUCCESS_45 if COLOR_SUCCESS_45.isValid() else color_with_alpha(COLOR_SUCCESS, SUCCESS_GLOW_ALPHA))
         self._card.setGraphicsEffect(glow)
         self._success_glow = glow
         self._card.setProperty("state", "success")

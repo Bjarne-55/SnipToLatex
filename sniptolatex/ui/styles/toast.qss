@@ -11,8 +11,7 @@ QFrame#toastCard {
 
 /* Success border highlight */
 QFrame#toastCard[state="success"] {
-    /* rgba(74,222,128,0.45) */
-    border: 1px solid rgba(74, 222, 128, 0.45);
+    border: 1px solid @ok-45;
 }
 
 /* Title + description */
