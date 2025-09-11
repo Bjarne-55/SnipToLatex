@@ -113,11 +113,12 @@ class _Spinner(QWidget):
     advances on a timer to create motion.
     """
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, thickness: float = SPINNER_THICKNESS) -> None:
         super().__init__(parent)
         self.setFixedSize(SPINNER_SIZE)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self._angle = 0
+        self._thickness = float(thickness)
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(SPINNER_TICK_MS)
@@ -131,7 +132,7 @@ class _Spinner(QWidget):
         self.update()
 
     def paintEvent(self, _) -> None:  # type: ignore[override]
-        thickness = SPINNER_THICKNESS
+        thickness = self._thickness
         gap_deg = SPINNER_GAP_DEG
         start_deg = self._angle * 16
         span_deg = int((360.0 - gap_deg) * 16)
@@ -169,11 +170,12 @@ class _CheckIcon(QWidget):
     linearly to the cumulative path length, producing a smooth reveal.
     """
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, pen_width: float = 2.5) -> None:
         super().__init__(parent)
         self.setFixedSize(CHECK_SIZE)
         self._color = COLOR_SUCCESS
         self._progress = 0.0  # 0..1 controls how much of the path is drawn
+        self._pen_width = float(pen_width)
         self._anim = QPropertyAnimation(self, b"animProgress", self)
         self._anim.setDuration(250)
         self._anim.setStartValue(0.0)
@@ -232,7 +234,7 @@ class _CheckIcon(QWidget):
             partial.lineTo(end)
 
         pen = QPen(self._color)
-        pen.setWidthF(2.5)
+        pen.setWidthF(self._pen_width)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         p.setPen(pen)
@@ -270,6 +272,7 @@ class Toast(QWidget):
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self._configure_window()
+        self._init_scale()
         self._build_ui()
         self._setup_behavior()
         # Apply QSS for visual style
@@ -284,14 +287,42 @@ class Toast(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setWindowFlag(Qt.WindowType.NoDropShadowWindowHint, True)
 
+    # --- DPI scaling helpers ---------------------------------------------------------
+    def _init_scale(self) -> None:
+        screen = QGuiApplication.primaryScreen()
+        try:
+            dpi = float(screen.logicalDotsPerInch()) if screen is not None else 96.0
+        except Exception:
+            dpi = 96.0
+        scale = dpi / 96.0
+        if scale < 1.0:
+            scale = 1.0
+        if scale > 3.0:
+            scale = 3.0
+        self._scale = scale
+
+    def _scale_px(self, px: int) -> int:
+        return max(1, int(round(px * float(getattr(self, "_scale", 1.0)))))
+
+    def _scale_thickness(self, val: float) -> float:
+        return float(val) * float(getattr(self, "_scale", 1.0))
+
+    def _scale_size(self, sz: QSize) -> QSize:
+        return QSize(self._scale_px(sz.width()), self._scale_px(sz.height()))
+
     def _build_ui(self) -> None:
         """Create the card and its internal content layout (icon + text)."""
-        self._card = _Card(self)
+        self._card = _Card(self, radius=self._scale_px(RADIUS_PX))
         self._card.setObjectName("toastCard")
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.addWidget(self._card)
         self._build_content(self._card)
+        # Ensure QSS corner radius matches the mask for HiDPI scaling
+        try:
+            self._card.setStyleSheet(f"border-radius: {self._scale_px(RADIUS_PX)}px;")
+        except Exception:
+            pass
 
     def _build_content(self, parent: QWidget) -> None:
         """Build the icon and text row within the card.
@@ -300,27 +331,29 @@ class Toast(QWidget):
             parent: The card widget that hosts the content.
         """
         content_layout = QVBoxLayout(parent)
-        content_layout.setContentsMargins(14, 12, 14, 12)
-        content_layout.setSpacing(8)
+        content_layout.setContentsMargins(self._scale_px(14), self._scale_px(12), self._scale_px(14), self._scale_px(12))
+        content_layout.setSpacing(self._scale_px(8))
 
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(12)
+        row.setSpacing(self._scale_px(12))
         row.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self._icon_wrap = QWidget(parent)
-        self._icon_wrap.setFixedSize(ICON_BOX)
+        self._icon_wrap.setFixedSize(self._scale_size(ICON_BOX))
         icon_layout = QHBoxLayout(self._icon_wrap)
         icon_layout.setContentsMargins(0, 0, 0, 0)
         icon_layout.setSpacing(0)
         icon_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self._spinner = _Spinner(self._icon_wrap)
-        self._check = _CheckIcon(self._icon_wrap)
+        self._spinner = _Spinner(self._icon_wrap, thickness=self._scale_thickness(SPINNER_THICKNESS))
+        self._spinner.setFixedSize(self._scale_size(SPINNER_SIZE))
+        self._check = _CheckIcon(self._icon_wrap, pen_width=self._scale_thickness(2.5))
+        self._check.setFixedSize(self._scale_size(CHECK_SIZE))
         self._error = QLabel(self._icon_wrap)
-        self._error.setFixedSize(CHECK_SIZE)
+        self._error.setFixedSize(self._scale_size(CHECK_SIZE))
         self._error.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._error.setPixmap(load_pixmap("error.svg", CHECK_SIZE))
+        self._error.setPixmap(load_pixmap("error.svg", self._scale_size(CHECK_SIZE)))
         self._check.hide()
         self._error.hide()
         icon_layout.addWidget(self._spinner)
@@ -329,7 +362,7 @@ class Toast(QWidget):
 
         text_col = QVBoxLayout()
         text_col.setContentsMargins(0, 0, 0, 0)
-        text_col.setSpacing(4)
+        text_col.setSpacing(self._scale_px(4))
         self._title = QLabel(parent)
         self._title.setObjectName("toastTitle")
         self._title.setText("Sending to model…")
@@ -343,7 +376,7 @@ class Toast(QWidget):
 
         row.addWidget(self._icon_wrap)
         row.addLayout(text_col)
-        row.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        row.addItem(QSpacerItem(self._scale_px(10), self._scale_px(10), QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
 
         content_layout.addLayout(row)
         content_layout.setAlignment(row, Qt.AlignmentFlag.AlignVCenter)
@@ -369,10 +402,10 @@ class Toast(QWidget):
         geo = screen.availableGeometry()
         self.adjustSize()
         x = geo.center().x() - self.width() // 2
-        y = geo.bottom() - self.height() - BOTTOM_MARGIN_PX
+        y = geo.bottom() - self.height() - self._scale_px(BOTTOM_MARGIN_PX)
         # Keep within screen bounds with small side padding
-        left_bound = geo.left() + SIDE_PADDING_PX
-        right_bound = geo.right() - self.width() - SIDE_PADDING_PX
+        left_bound = geo.left() + self._scale_px(SIDE_PADDING_PX)
+        right_bound = geo.right() - self.width() - self._scale_px(SIDE_PADDING_PX)
         self.move(max(left_bound, min(x, right_bound)), max(geo.top() + 12, y))
 
     def show_loading(self) -> None:
@@ -414,7 +447,7 @@ class Toast(QWidget):
         self._desc.setText("Response copied to clipboard")
         # Add a subtle green glow around the card
         glow = QGraphicsDropShadowEffect(self)
-        glow.setBlurRadius(SUCCESS_GLOW_BLUR)
+        glow.setBlurRadius(self._scale_px(SUCCESS_GLOW_BLUR))
         glow.setXOffset(0)
         glow.setYOffset(0)
         # Prefer theme token with alpha if available
@@ -458,7 +491,7 @@ class Toast(QWidget):
         self._desc.setText(desc)
 
         glow = QGraphicsDropShadowEffect(self)
-        glow.setBlurRadius(SUCCESS_GLOW_BLUR)
+        glow.setBlurRadius(self._scale_px(SUCCESS_GLOW_BLUR))
         glow.setXOffset(0)
         glow.setYOffset(0)
         glow.setColor(COLOR_ERROR_45 if COLOR_ERROR_45.isValid() else color_with_alpha(COLOR_ERROR, 0.45))
